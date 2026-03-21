@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ohio High Wheel Race | September 10, 2026 | Plain City, Ohio</title>
+  <meta name="description" content="The Ohio High Wheel Race returns to downtown Plain City, Ohio on September 10, 2026. A one-hour penny farthing race through historic uptown. Register now!">
+
+  <!-- Open Graph -->
+  <meta property="og:title"       content="Ohio High Wheel Race 2026">
+  <meta property="og:description" content="One hour. ~0.9 miles. Race to zero. Penny farthing racing returns to Plain City, Ohio — September 10, 2026.">
+  <meta property="og:image"       content="images/og-image.png">
+  <meta property="og:url"         content="https://highwheelraceohio.com/">
+  <meta property="og:type"        content="website">
+
+  <!-- Favicon placeholder -->
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Header injected by JS -->
+  <div id="header-slot"></div>
+
+  <main>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+      <div class="hero-content">
+
+        <!-- Clock tower + penny farthing overlay -->
+        <div class="hero-logo hero-overlay">
+          <img src="images/plaincity_clock.png" alt="The Clock Tower in downtown Plain City, Ohio" class="overlay-base">
+          <div class="overlay-bikes">
+            <img src="images/penny-farthing.svg" alt="Penny farthing bicycle" class="overlay-bike" style="width:80px;">
+            <img src="images/penny-farthing.svg" alt="Penny farthing bicycle" class="overlay-bike" style="width:80px;">
+            <img src="images/penny-farthing.svg" alt="Penny farthing bicycle" class="overlay-bike" style="width:80px;">
+            <img src="images/penny-farthing.svg" alt="Penny farthing bicycle" class="overlay-bike" style="width:80px;">
+            <img src="images/penny-farthing.svg" alt="Penny farthing bicycle" class="overlay-bike" style="width:80px;">
+          </div>
+        </div>
+
+        <!-- SVG Logo (hidden, kept for reference) -->
+        <div style="display:none" aria-hidden="true">
+          <svg viewBox="0 0 400 210" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+            <!-- Speed lines (left of front wheel) -->
+            <line x1="2"  y1="104" x2="36" y2="104" stroke="#B87333" stroke-width="3.5" stroke-linecap="round"/>
+            <line x1="8"  y1="118" x2="36" y2="118" stroke="#B87333" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="16" y1="132" x2="36" y2="132" stroke="#B87333" stroke-width="2"   stroke-linecap="round"/>
+
+            <!-- ===== LARGE FRONT WHEEL (animated) ===== -->
+            <g class="wheel-anim">
+              <circle cx="118" cy="118" r="80" stroke="#B87333" stroke-width="3" fill="none"/>
+              <!-- 8 spokes (diameters through center at 22.5° intervals) -->
+              <line x1="118" y1="38"  x2="118" y2="198" stroke="#B87333" stroke-width="1.5" opacity="0.55"/>
+              <line x1="38"  y1="118" x2="198" y2="118" stroke="#B87333" stroke-width="1.5" opacity="0.55"/>
+              <line x1="61"  y1="61"  x2="175" y2="175" stroke="#B87333" stroke-width="1.5" opacity="0.55"/>
+              <line x1="175" y1="61"  x2="61"  y2="175" stroke="#B87333" stroke-width="1.5" opacity="0.55"/>
+              <line x1="44"  y1="87"  x2="192" y2="149" stroke="#B87333" stroke-width="1.2" opacity="0.38"/>
+              <line x1="87"  y1="44"  x2="149" y2="192" stroke="#B87333" stroke-width="1.2" opacity="0.38"/>
+              <line x1="149" y1="44"  x2="87"  y2="192" stroke="#B87333" stroke-width="1.2" opacity="0.38"/>
+              <line x1="192" y1="87"  x2="44"  y2="149" stroke="#B87333" stroke-width="1.2" opacity="0.38"/>
+              <!-- Hub -->
+              <circle cx="118" cy="118" r="9" fill="#B87333"/>
+              <!-- Pedal cranks (rotate with wheel) — right crank up-left, left crank down-right -->
+              <line x1="118" y1="118" x2="100" y2="134" stroke="#B87333" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="100" y1="134" x2="91"  y2="127" stroke="#B87333" stroke-width="3"   stroke-linecap="round"/>
+              <line x1="118" y1="118" x2="136" y2="102" stroke="#B87333" stroke-width="3.5" stroke-linecap="round"/>
+              <line x1="136" y1="102" x2="145" y2="109" stroke="#B87333" stroke-width="3"   stroke-linecap="round"/>
+            </g>
+
+            <!-- ===== SMALL REAR WHEEL (animated, faster) ===== -->
+            <g class="wheel-anim" style="animation-duration:3.6s">
+              <circle cx="308" cy="162" r="36" stroke="#B87333" stroke-width="2.5" fill="none"/>
+              <!-- 4 spokes -->
+              <line x1="308" y1="126" x2="308" y2="198" stroke="#B87333" stroke-width="1.2" opacity="0.55"/>
+              <line x1="272" y1="162" x2="344" y2="162" stroke="#B87333" stroke-width="1.2" opacity="0.55"/>
+              <line x1="283" y1="137" x2="333" y2="187" stroke="#B87333" stroke-width="1.2" opacity="0.55"/>
+              <line x1="333" y1="137" x2="283" y2="187" stroke="#B87333" stroke-width="1.2" opacity="0.55"/>
+              <!-- Hub -->
+              <circle cx="308" cy="162" r="5.5" fill="#B87333"/>
+            </g>
+
+            <!-- ===== FRAME ===== -->
+            <!-- Fork: nearly vertical from fork crown (top of front wheel) to front axle -->
+            <line x1="114" y1="37" x2="118" y2="118" stroke="#B87333" stroke-width="3.5" stroke-linecap="round"/>
+            <!-- Backbone: curved tube sweeping from fork crown back-right to rear axle -->
+            <path d="M 114,37 C 162,82 238,140 308,162" stroke="#B87333" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <!-- Seat post: rises from backbone (above front wheel area) to saddle -->
+            <line x1="130" y1="50" x2="127" y2="28" stroke="#B87333" stroke-width="3" stroke-linecap="round"/>
+            <!-- Saddle -->
+            <path d="M 116,26 C 124,21 136,21 144,26" stroke="#B87333" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+            <!-- Handlebar stem: rises from fork crown -->
+            <line x1="114" y1="37" x2="112" y2="13" stroke="#B87333" stroke-width="3" stroke-linecap="round"/>
+            <!-- Handlebars: horizontal bar with drooping ends -->
+            <path d="M 92,15 C 96,11 102,13 108,13 L 116,13 C 122,13 128,11 132,15" stroke="#B87333" stroke-width="3" fill="none" stroke-linecap="round"/>
+
+            <!-- ===== RIDER ===== -->
+            <!-- Head (above saddle, slightly right of seat post) -->
+            <circle cx="133" cy="20" r="10" stroke="#B87333" stroke-width="2.5" fill="none"/>
+            <!-- Torso: neck down to saddle -->
+            <line x1="133" y1="30" x2="130" y2="26" stroke="#B87333" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- Arms: reaching forward-left to handlebars -->
+            <line x1="133" y1="24" x2="112" y2="14" stroke="#B87333" stroke-width="2.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+
+        <h1>Ohio High Wheel Race</h1>
+        <p class="hero-sub">September 10, 2026 &bull; Downtown Plain City, Ohio</p>
+        <div class="hero-btns">
+          <a href="racerregistration.html" class="btn btn-primary">Register Now</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RACE OVERVIEW STRIP ===== -->
+    <section class="overview-strip">
+      <div class="overview-grid">
+
+        <div class="overview-card">
+          <div class="overview-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+              <line x1="12" y1="2"  x2="12" y2="5"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+              <line x1="2"  y1="12" x2="5"  y2="12"/>
+              <line x1="19" y1="12" x2="22" y2="12"/>
+            </svg>
+          </div>
+          <div class="overview-stat">~0.9 mi</div>
+          <div class="overview-label">Course Length</div>
+        </div>
+
+        <div class="overview-card">
+          <div class="overview-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="overview-stat">1 Hour</div>
+          <div class="overview-label">Race Duration</div>
+        </div>
+
+        <div class="overview-card">
+          <div class="overview-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <div class="overview-stat">Plain City</div>
+          <div class="overview-label">Plain City, Ohio</div>
+        </div>
+
+        <div class="overview-card">
+          <div class="overview-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+          </div>
+          <div class="overview-stat">Race to Zero</div>
+          <div class="overview-label">Format</div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== COURSE DESCRIPTION ===== -->
+    <section class="course-section section">
+      <div class="course-grid container">
+        <div>
+          <h2 class="section-heading">The Course</h2>
+          <p>The race winds through the charming streets of historic downtown Plain City — one of Ohio's most picturesque small-town settings. The loop is approximately <strong>0.9 miles</strong>, starting and finishing right in front of <a href="https://www.theclocktowerkitchenandbar.com/" target="_blank" rel="noopener noreferrer">The Clock Tower Kitchen &amp; Bar</a> at 101 S Chillicothe St.</p>
+          <p>The <strong>race-to-zero format</strong> means the race clock runs for one full hour. Riders complete as many laps as possible within that time — if the clock hasn't reached zero when you finish a lap, you head out for another.</p>
+          <p>Faster riders stay to the outside of the course; slower riders keep to the inside. Always signal before passing and show respect to your fellow high-wheelers.</p>
+          <p>
+            <a href="https://www.theclocktowerkitchenandbar.com/" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top:0.5rem">
+              Visit The Clock Tower ↗
+            </a>
+          </p>
+        </div>
+        <div>
+          <img src="images/PlainCityRaceRoute.png" alt="Plain City Race Route map" style="width:100%;border-radius:var(--radius);box-shadow:var(--shadow-md);">
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== KEY DATES ===== -->
+    <section class="dates-section section">
+      <div class="container" style="text-align:center;">
+        <h2 class="section-heading center">Key Dates</h2>
+        <div class="timeline">
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Now Open</div>
+            <div class="timeline-title">Registration is Open</div>
+            <p class="timeline-desc">Head to the <a href="racerregistration.html">Racers page</a> to register and pay your $45 entry fee via Venmo.</p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Thursday, September 10, 2026</div>
+            <div class="timeline-title">Race Day &mdash; Ohio High Wheel Race</div>
+            <p class="timeline-desc">Check-in, safety briefing, and one hour of penny farthing racing through downtown Plain City. Followed by a post-race dinner at The Clock Tower and the Corn Carnival Parade.</p>
+          </div>
+
+          <div class="timeline-item">
+            <div class="timeline-dot"></div>
+            <div class="timeline-date">Saturday, September 12, 2026</div>
+            <div class="timeline-title">Corn Carnival &mdash; Penny Farthing Display</div>
+            <p class="timeline-desc">Penny farthings on display during the <a href="https://www.plaincityohio.gov/residents/corncarnival2026.php" target="_blank" rel="noopener noreferrer">Plain City Corn Carnival</a> — part of the America 250 celebration.</p>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Sponsors moved to sponsors.html -->
+
+  </main>
+
+  <!-- Footer injected by JS -->
+  <div id="footer-slot"></div>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
