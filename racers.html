@@ -325,50 +325,5 @@
 
   <div id="footer-slot"></div>
   <script src="js/main.js"></script>
-  <script>
-    function initRideForm(formId, successId, errorId, btnText) {
-      const form = document.getElementById(formId);
-      if (!form) return;
-      const success = document.getElementById(successId);
-      const error = document.getElementById(errorId);
-      const btn = form.querySelector('button[type="submit"]');
-
-      form.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const req = form.querySelector('input[type="checkbox"][id^="req"]');
-        if (req && !req.checked) {
-          error.textContent = 'Please confirm you will have a helmet and your own penny farthing.';
-          error.style.display = 'block';
-          return;
-        }
-        error.style.display = 'none';
-        btn.disabled = true;
-        btn.textContent = 'Submitting…';
-        try {
-          const res = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'Accept': 'application/json' } });
-          if (res.ok) {
-            form.style.display = 'none';
-            success.style.display = 'block';
-          } else {
-            const json = await res.json();
-            error.textContent = (json.errors || []).map(e => e.message).join(', ') || 'Submission failed. Please try again.';
-            error.style.display = 'block';
-            btn.disabled = false;
-            btn.textContent = btnText;
-          }
-        } catch {
-          error.textContent = 'Network error. Please check your connection and try again.';
-          error.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = btnText;
-        }
-      });
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      initRideForm('form-40', 'success-40', 'error-40', 'Sign Up for 40-Mile Ride');
-      initRideForm('form-21', 'success-21', 'error-21', 'Sign Up for 21-Mile Ride');
-    });
-  </script>
 </body>
 </html>

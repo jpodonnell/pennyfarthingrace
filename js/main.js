@@ -207,6 +207,56 @@ function initRegistrationForm() {
   });
 }
 
+/* --- Ride Sign-Up Forms --- */
+function initRideForm(formId, successId, errorId, btnLabel) {
+  const form = document.getElementById(formId);
+  if (!form) return;
+
+  const successMsg = document.getElementById(successId);
+  const errorMsg   = document.getElementById(errorId);
+  const submitBtn  = form.querySelector('button[type="submit"]');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const reqCheck = form.querySelector('input[type="checkbox"][name="requirements_confirmed"]');
+    if (reqCheck && !reqCheck.checked) {
+      errorMsg.textContent = 'Please confirm you will have a helmet and your own penny farthing.';
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    errorMsg.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (response.ok) {
+        form.style.display = 'none';
+        if (successMsg) successMsg.style.display = 'block';
+      } else {
+        const json = await response.json();
+        const msg = (json.errors || []).map(e => e.message).join(', ') || 'Submission failed. Please try again.';
+        errorMsg.textContent = msg;
+        errorMsg.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = btnLabel;
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Network error. Please check your connection and try again.';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = btnLabel;
+    }
+  });
+}
+
 /* --- Smooth scroll for anchor links --- */
 function initSmoothScroll() {
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -226,5 +276,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setActiveNav();
   initMobileNav();
   initRegistrationForm();
+  initRideForm('form-40', 'success-40', 'error-40', 'Sign Up for 40-Mile Ride');
+  initRideForm('form-21', 'success-21', 'error-21', 'Sign Up for 21-Mile Ride');
   initSmoothScroll();
 });
