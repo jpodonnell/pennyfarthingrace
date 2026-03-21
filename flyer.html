@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ohio High Wheel Race 2026 — Flyer</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=Inter:wght@300;400;500;600&display=swap">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #e0d8cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .flyer {
+      width: 8.5in;
+      min-height: 11in;
+      background: #1B2A4A;
+      color: #fff;
+      padding: 0.6in 0.65in;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Decorative background rings */
+    .flyer::before {
+      content: '';
+      position: absolute;
+      width: 9in;
+      height: 9in;
+      border-radius: 50%;
+      border: 80px solid rgba(184,115,51,0.06);
+      top: -3in;
+      left: -2in;
+      pointer-events: none;
+    }
+    .flyer::after {
+      content: '';
+      position: absolute;
+      width: 6in;
+      height: 6in;
+      border-radius: 50%;
+      border: 50px solid rgba(184,115,51,0.05);
+      bottom: -2in;
+      right: -1.5in;
+      pointer-events: none;
+    }
+
+    .flyer-inner {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Top label */
+    .top-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: #B87333;
+      margin-bottom: 0.35in;
+      border-top: 1px solid rgba(184,115,51,0.4);
+      border-bottom: 1px solid rgba(184,115,51,0.4);
+      padding: 0.1in 0.3in;
+    }
+
+    /* Bike image */
+    .bike-wrap {
+      width: 3.2in;
+      margin-bottom: 0.3in;
+      position: relative;
+    }
+    .bike-wrap img {
+      width: 100%;
+      height: auto;
+      display: block;
+      filter: invert(1) sepia(1) saturate(2) hue-rotate(5deg) brightness(0.85);
+      opacity: 0.9;
+    }
+
+    /* Main title */
+    .title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 1.15in;
+      font-weight: 900;
+      line-height: 0.9;
+      color: #fff;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.08in;
+    }
+    .title span {
+      display: block;
+      font-size: 0.55in;
+      font-weight: 700;
+      color: #B87333;
+      letter-spacing: 0.04em;
+    }
+
+    /* Copper divider */
+    .divider {
+      width: 0.8in;
+      height: 4px;
+      background: #B87333;
+      border-radius: 2px;
+      margin: 0.2in auto;
+    }
+
+    /* Date / Location block */
+    .event-meta {
+      margin-bottom: 0.25in;
+    }
+    .event-date {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.38in;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+    }
+    .event-location {
+      font-size: 0.22in;
+      font-weight: 500;
+      color: rgba(255,255,255,0.75);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-top: 0.08in;
+    }
+
+    /* Schedule strip */
+    .schedule {
+      display: flex;
+      gap: 0;
+      width: 100%;
+      margin: 0.25in 0;
+      border: 1.5px solid rgba(184,115,51,0.5);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .schedule-item {
+      flex: 1;
+      padding: 0.18in 0.15in;
+      border-right: 1.5px solid rgba(184,115,51,0.3);
+      text-align: center;
+    }
+    .schedule-item:last-child { border-right: none; }
+    .schedule-time {
+      font-size: 0.16in;
+      font-weight: 700;
+      color: #B87333;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 0.06in;
+    }
+    .schedule-event {
+      font-size: 0.17in;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    /* Details block */
+    .details {
+      display: flex;
+      gap: 0.3in;
+      margin: 0.2in 0;
+      justify-content: center;
+    }
+    .detail-item {
+      text-align: center;
+    }
+    .detail-value {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.32in;
+      font-weight: 700;
+      color: #B87333;
+      line-height: 1;
+    }
+    .detail-label {
+      font-size: 0.13in;
+      color: rgba(255,255,255,0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-top: 0.04in;
+    }
+
+    /* Description */
+    .description {
+      font-size: 0.17in;
+      color: rgba(255,255,255,0.8);
+      line-height: 1.6;
+      max-width: 6.5in;
+      margin: 0.15in 0 0.25in;
+    }
+
+    /* Corn carnival note */
+    .carnival-note {
+      background: rgba(184,115,51,0.15);
+      border: 1px solid rgba(184,115,51,0.4);
+      border-radius: 6px;
+      padding: 0.15in 0.3in;
+      font-size: 0.16in;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 0.25in;
+      width: 100%;
+    }
+    .carnival-note strong { color: #B87333; }
+
+    /* Requirements */
+    .requirements {
+      display: flex;
+      gap: 0.4in;
+      margin-bottom: 0.3in;
+      justify-content: center;
+    }
+    .req-item {
+      display: flex;
+      align-items: center;
+      gap: 0.08in;
+      font-size: 0.15in;
+      color: rgba(255,255,255,0.75);
+    }
+    .req-dot {
+      width: 6px;
+      height: 6px;
+      background: #B87333;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* Website / CTA */
+    .cta {
+      margin-top: auto;
+      padding-top: 0.2in;
+      border-top: 1px solid rgba(184,115,51,0.3);
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .cta-text {
+      font-size: 0.14in;
+      color: rgba(255,255,255,0.55);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .cta-url {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 0.22in;
+      font-weight: 700;
+      color: #B87333;
+      letter-spacing: 0.02em;
+    }
+    .cta-register {
+      font-size: 0.14in;
+      color: rgba(255,255,255,0.55);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      text-align: right;
+    }
+
+    /* Print styles */
+    @media print {
+      body {
+        background: none;
+        padding: 0;
+        margin: 0;
+      }
+      .flyer {
+        width: 8.5in;
+        min-height: 11in;
+        page-break-after: always;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Print button (hidden when printing) -->
+  <div class="no-print" style="position:fixed;top:1rem;right:1rem;z-index:100;">
+    <button onclick="window.print()" style="background:#B87333;color:#fff;border:none;padding:0.6rem 1.25rem;border-radius:6px;font-size:0.95rem;font-weight:600;cursor:pointer;">
+      Print / Save as PDF
+    </button>
+  </div>
+
+  <div class="flyer">
+    <div class="flyer-inner">
+
+      <div class="top-label">Plain City, Ohio &bull; America 250 Celebration</div>
+
+      <div class="bike-wrap">
+        <img src="images/penny-farthing.svg" alt="Penny farthing bicycle">
+      </div>
+
+      <div class="title">
+        Ohio<br>
+        High Wheel<br>
+        <span>Race</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="event-meta">
+        <div class="event-date">Thursday, September 10, 2026</div>
+        <div class="event-location">Downtown Plain City, Ohio</div>
+      </div>
+
+      <div class="schedule">
+        <div class="schedule-item">
+          <div class="schedule-time">~5:00 PM</div>
+          <div class="schedule-event">Pre-Race<br>Parade</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-time">5:30–6:00 PM</div>
+          <div class="schedule-event">Race<br>Start</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-time">6:30–7:00 PM</div>
+          <div class="schedule-event">Race<br>Finish</div>
+        </div>
+        <div class="schedule-item">
+          <div class="schedule-time">Post Race</div>
+          <div class="schedule-event">Corn Carnival<br>Parade</div>
+        </div>
+      </div>
+
+      <div class="details">
+        <div class="detail-item">
+          <div class="detail-value">~0.9 mi</div>
+          <div class="detail-label">Course Loop</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-value">1 Hour</div>
+          <div class="detail-label">Race Duration</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-value">Race to Zero</div>
+          <div class="detail-label">Format</div>
+        </div>
+      </div>
+
+      <p class="description">
+        Watch penny farthing riders compete through the charming streets of historic downtown Plain City in a one-hour race-to-zero format. Riders complete as many laps as possible before the clock runs out — a unique and thrilling event you won't want to miss.
+      </p>
+
+      <div class="carnival-note">
+        Part of the <strong>Plain City Corn Carnival</strong> &bull; <strong>America's 250th Anniversary Celebration</strong><br>
+        Penny farthings on display all day Saturday, September 12 at the Corn Carnival
+      </div>
+
+      <div class="requirements">
+        <div class="req-item"><div class="req-dot"></div>Free to spectate</div>
+        <div class="req-item"><div class="req-dot"></div>Family friendly</div>
+        <div class="req-item"><div class="req-dot"></div>Riders must register in advance</div>
+        <div class="req-item"><div class="req-dot"></div>Helmets required</div>
+      </div>
+
+      <div class="cta">
+        <div class="cta-text">Event info &amp; registration</div>
+        <div class="cta-url">highwheelraceohio.com</div>
+        <div class="cta-register">Register to ride at<br>highwheelraceohio.com</div>
+      </div>
+
+    </div>
+  </div>
+
+</body>
+</html>
