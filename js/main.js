@@ -69,6 +69,7 @@ const HEADER_HTML = `
     <nav>
       <ul class="nav-links" id="nav-links">
         <li><a href="index.html">Home</a></li>
+        <li><a href="about.html">About</a></li>
         <li><a href="racerregistration.html">Registration</a></li>
         <li><a href="info.html">Info &amp; Directions</a></li>
         <li><a href="volunteer.html">Volunteer</a></li>
@@ -90,6 +91,7 @@ const FOOTER_HTML = `
     <div class="footer-col">
       <h4>Quick Links</h4>
       <a href="index.html">Home</a>
+      <a href="about.html">About</a>
       <a href="racerregistration.html">Racer Registration</a>
       <a href="info.html">Info &amp; Directions</a>
       <a href="volunteer.html">Volunteer</a>
