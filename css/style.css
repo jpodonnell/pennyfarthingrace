@@ -896,6 +896,9 @@ p:last-child { margin-bottom: 0; }
   /* Rules list: single column */
   .rules-list { grid-template-columns: 1fr; }
 
+  /* Friday ride forms: single column */
+  .ride-forms-grid { grid-template-columns: 1fr !important; }
+
   /* Payment card padding */
   .payment-card { padding: 1.5rem 1.25rem; }
 }
