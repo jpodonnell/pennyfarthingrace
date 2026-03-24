@@ -343,7 +343,7 @@
           </div>
           <div class="form-error-msg" id="bio-error" role="alert"></div>
 
-          <form id="bio-form" action="https://api.web3forms.com/submit" method="POST" enctype="multipart/form-data" novalidate>
+          <form id="bio-form" action="https://api.web3forms.com/submit" method="POST" novalidate>
             <input type="hidden" name="access_key" value="f0cbb500-ae9b-4bce-911e-8ea3ed83ea52">
             <input type="hidden" name="subject" value="Racer Bio — Ohio High Wheel Race">
             <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
@@ -400,12 +400,6 @@
             <div class="form-group">
               <label for="bio-funfact">A fun fact about yourself</label>
               <textarea id="bio-funfact" name="fun_fact" rows="3" placeholder="Anything goes!"></textarea>
-            </div>
-
-            <!-- Photo -->
-            <div class="form-group">
-              <label for="bio-photo">Photo <span style="font-weight:400;color:var(--text-mid);">(optional — you and/or your bike)</span></label>
-              <input type="file" id="bio-photo" name="photo" accept="image/*" style="padding:0.5rem 0;">
             </div>
 
             <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:0.875rem;">
