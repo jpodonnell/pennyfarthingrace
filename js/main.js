@@ -257,6 +257,50 @@ function initRideForm(formId, successId, errorId, btnLabel) {
   });
 }
 
+/* --- Racer Bio Form --- */
+function initBioForm() {
+  const form = document.getElementById('bio-form');
+  if (!form) return;
+
+  const successMsg = document.getElementById('bio-success');
+  const errorMsg   = document.getElementById('bio-error');
+  const submitBtn  = form.querySelector('button[type="submit"]');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    errorMsg.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (response.ok) {
+        form.style.display = 'none';
+        if (successMsg) successMsg.style.display = 'block';
+        window.scrollTo({ top: successMsg.offsetTop - 100, behavior: 'smooth' });
+      } else {
+        const json = await response.json();
+        const msg = (json.errors || []).map(e => e.message).join(', ') || 'Submission failed. Please try again.';
+        errorMsg.textContent = msg;
+        errorMsg.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Racer Bio';
+      }
+    } catch (err) {
+      errorMsg.textContent = 'Network error. Please check your connection and try again.';
+      errorMsg.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit Racer Bio';
+    }
+  });
+}
+
 /* --- Smooth scroll for anchor links --- */
 function initSmoothScroll() {
   document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -278,5 +322,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initRegistrationForm();
   initRideForm('form-40', 'success-40', 'error-40', 'Sign Up for 40-Mile Ride');
   initRideForm('form-21', 'success-21', 'error-21', 'Sign Up for 21-Mile Ride');
+  initBioForm();
   initSmoothScroll();
 });
