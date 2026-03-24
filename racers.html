@@ -88,94 +88,6 @@
       </div>
     </section>
 
-    <!-- ===== RACER BIO FORM ===== -->
-    <section class="register-section section" id="bio" style="background:var(--cream);">
-      <div class="container">
-        <h2 class="section-heading center">Racer Bio</h2>
-        <p style="text-align:center;color:var(--text-mid);margin-bottom:2rem;max-width:560px;margin-left:auto;margin-right:auto;">Tell us a little about yourself! We'll use your bio to introduce you to the crowd on race day.</p>
-
-        <div class="form-wrap">
-
-          <div class="form-success" id="bio-success" role="alert">
-            <h3>Bio received!</h3>
-            <p>Thanks for sharing — we can't wait to introduce you on race day. See you in Plain City!</p>
-          </div>
-          <div class="form-error-msg" id="bio-error" role="alert"></div>
-
-          <form id="bio-form" action="https://api.web3forms.com/submit" method="POST" enctype="multipart/form-data" novalidate>
-            <input type="hidden" name="access_key" value="f0cbb500-ae9b-4bce-911e-8ea3ed83ea52">
-            <input type="hidden" name="subject" value="Racer Bio — Ohio High Wheel Race">
-            <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
-
-            <!-- Name -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="bio-first">First Name <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="bio-first" name="first_name" required autocomplete="given-name" placeholder="Jane">
-              </div>
-              <div class="form-group">
-                <label for="bio-last">Last Name <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="bio-last" name="last_name" required autocomplete="family-name" placeholder="Smith">
-              </div>
-            </div>
-
-            <!-- Hometown -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="bio-city">Hometown <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="bio-city" name="hometown_city" required autocomplete="address-level2" placeholder="Plain City">
-              </div>
-              <div class="form-group">
-                <label for="bio-state">State <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="bio-state" name="hometown_state" required autocomplete="address-level1" placeholder="OH">
-              </div>
-            </div>
-
-            <!-- Riding experience -->
-            <div class="form-group">
-              <label for="bio-years">How long have you been riding a penny farthing? <span class="req" aria-hidden="true">*</span></label>
-              <input type="text" id="bio-years" name="years_riding" required placeholder="e.g. 5 years, just started, since 2018">
-            </div>
-
-            <!-- Bike details -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="bio-bike-brand">Bike Brand / Make</label>
-                <input type="text" id="bio-bike-brand" name="bike_brand" placeholder="e.g. Monarch, Coventry, Custom">
-              </div>
-              <div class="form-group">
-                <label for="bio-wheel-size">Front Wheel Size</label>
-                <input type="text" id="bio-wheel-size" name="wheel_size" placeholder='e.g. 52"'>
-              </div>
-            </div>
-
-            <!-- Origin story -->
-            <div class="form-group">
-              <label for="bio-origin">How did you get into penny farthing riding? <span class="req" aria-hidden="true">*</span></label>
-              <textarea id="bio-origin" name="origin_story" required rows="4" placeholder="Tell us your story..."></textarea>
-            </div>
-
-            <!-- Fun fact -->
-            <div class="form-group">
-              <label for="bio-funfact">A fun fact about yourself</label>
-              <textarea id="bio-funfact" name="fun_fact" rows="3" placeholder="Anything goes!"></textarea>
-            </div>
-
-            <!-- Photo -->
-            <div class="form-group">
-              <label for="bio-photo">Photo <span style="font-weight:400;color:var(--text-mid);">(optional — you and/or your bike)</span></label>
-              <input type="file" id="bio-photo" name="photo" accept="image/*" style="padding:0.5rem 0;">
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:0.875rem;">
-              Submit Racer Bio
-            </button>
-
-          </form>
-        </div>
-      </div>
-    </section>
-
     <!-- ===== THURSDAY SEPT 10 ===== -->
     <section class="schedule-section section">
       <div class="container">
@@ -413,6 +325,94 @@
             </div>
           </div>
 
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== RACER BIO FORM ===== -->
+    <section class="register-section section" id="bio" style="background:var(--cream);">
+      <div class="container">
+        <h2 class="section-heading center">Racer Bio</h2>
+        <p style="text-align:center;color:var(--text-mid);margin-bottom:2rem;max-width:560px;margin-left:auto;margin-right:auto;">Tell us a little about yourself! We'll use your bio to introduce you to the crowd on race day.</p>
+
+        <div class="form-wrap">
+
+          <div class="form-success" id="bio-success" role="alert">
+            <h3>Bio received!</h3>
+            <p>Thanks for sharing — we can't wait to introduce you on race day. See you in Plain City!</p>
+          </div>
+          <div class="form-error-msg" id="bio-error" role="alert"></div>
+
+          <form id="bio-form" action="https://api.web3forms.com/submit" method="POST" enctype="multipart/form-data" novalidate>
+            <input type="hidden" name="access_key" value="f0cbb500-ae9b-4bce-911e-8ea3ed83ea52">
+            <input type="hidden" name="subject" value="Racer Bio — Ohio High Wheel Race">
+            <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
+
+            <!-- Name -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="bio-first">First Name <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="bio-first" name="first_name" required autocomplete="given-name" placeholder="Jane">
+              </div>
+              <div class="form-group">
+                <label for="bio-last">Last Name <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="bio-last" name="last_name" required autocomplete="family-name" placeholder="Smith">
+              </div>
+            </div>
+
+            <!-- Hometown -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="bio-city">Hometown <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="bio-city" name="hometown_city" required autocomplete="address-level2" placeholder="Plain City">
+              </div>
+              <div class="form-group">
+                <label for="bio-state">State <span class="req" aria-hidden="true">*</span></label>
+                <input type="text" id="bio-state" name="hometown_state" required autocomplete="address-level1" placeholder="OH">
+              </div>
+            </div>
+
+            <!-- Riding experience -->
+            <div class="form-group">
+              <label for="bio-years">How long have you been riding a penny farthing? <span class="req" aria-hidden="true">*</span></label>
+              <input type="text" id="bio-years" name="years_riding" required placeholder="e.g. 5 years, just started, since 2018">
+            </div>
+
+            <!-- Bike details -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="bio-bike-brand">Bike Brand / Make</label>
+                <input type="text" id="bio-bike-brand" name="bike_brand" placeholder="e.g. Monarch, Coventry, Custom">
+              </div>
+              <div class="form-group">
+                <label for="bio-wheel-size">Front Wheel Size</label>
+                <input type="text" id="bio-wheel-size" name="wheel_size" placeholder='e.g. 52"'>
+              </div>
+            </div>
+
+            <!-- Origin story -->
+            <div class="form-group">
+              <label for="bio-origin">How did you get into penny farthing riding? <span class="req" aria-hidden="true">*</span></label>
+              <textarea id="bio-origin" name="origin_story" required rows="4" placeholder="Tell us your story..."></textarea>
+            </div>
+
+            <!-- Fun fact -->
+            <div class="form-group">
+              <label for="bio-funfact">A fun fact about yourself</label>
+              <textarea id="bio-funfact" name="fun_fact" rows="3" placeholder="Anything goes!"></textarea>
+            </div>
+
+            <!-- Photo -->
+            <div class="form-group">
+              <label for="bio-photo">Photo <span style="font-weight:400;color:var(--text-mid);">(optional — you and/or your bike)</span></label>
+              <input type="file" id="bio-photo" name="photo" accept="image/*" style="padding:0.5rem 0;">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:0.875rem;">
+              Submit Racer Bio
+            </button>
+
+          </form>
         </div>
       </div>
     </section>
