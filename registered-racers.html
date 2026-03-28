@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registered Racers | Ohio High Wheel Race 2026</title>
+  <meta name="description" content="Meet the registered racers competing in the Ohio High Wheel Race on September 10, 2026 in Plain City, Ohio.">
+  <meta property="og:title"       content="Registered Racers — Ohio High Wheel Race 2026">
+  <meta property="og:description" content="Meet the field for the inaugural Ohio High Wheel Race — September 10, 2026 in Plain City, Ohio.">
+  <meta property="og:image"       content="images/og-image.png">
+  <meta property="og:url"         content="https://highwheelraceohio.com/registered-racers.html">
+  <meta property="og:type"        content="website">
+  <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div id="header-slot"></div>
+
+  <main>
+
+    <section class="page-hero">
+      <h1>Registered Racers</h1>
+      <p>The field for the inaugural Ohio High Wheel Race &mdash; September 10, 2026</p>
+    </section>
+
+    <!-- ===== RACER ROSTER =====
+         HOW TO ADD A RACER TO THE ROSTER:
+         1. Copy one <div class="racer-chip"> block from the TEMPLATE comment below.
+         2. Paste it inside the "racer-roster-grid" div.
+         3. Fill in the racer's name and City, ST.
+         4. Update the count shown in the "roster-count" span.
+         5. Remove the "empty-state" div once you have at least one racer.
+    ============================================================ -->
+    <section class="section" style="background:var(--white);">
+      <div class="container">
+
+        <div style="display:flex;align-items:baseline;gap:1rem;margin-bottom:0.5rem;">
+          <h2 class="section-heading" style="margin-bottom:0;">The Field</h2>
+          <!-- UPDATE THIS COUNT as racers register -->
+          <span id="roster-count" style="font-family:var(--font-body);font-size:1rem;font-weight:500;color:var(--copper);">3 registered</span>
+        </div>
+        <p style="color:var(--text-mid);margin-bottom:2rem;">
+          Riders confirmed for race day. Not on the list yet?
+          <a href="racerregistration.html">Register here.</a>
+        </p>
+
+        <!--
+          RACER CHIP TEMPLATE — paste copies of this inside the grid div below:
+
+          <div style="background:var(--cream);border-radius:var(--radius);padding:0.75rem 1.1rem;box-shadow:var(--shadow);min-width:160px;">
+            <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;color:var(--navy);font-size:1rem;">First Last</div>
+            <div style="color:var(--copper);font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">City, ST</div>
+          </div>
+        -->
+        <div id="racer-roster-grid" style="display:flex;flex-wrap:wrap;gap:0.75rem;">
+          <div style="background:var(--cream);border-radius:var(--radius);padding:0.75rem 1.1rem;box-shadow:var(--shadow);min-width:160px;">
+            <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;color:var(--navy);font-size:1rem;">Eric Norris</div>
+            <div style="color:var(--copper);font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Columbus, OH</div>
+          </div>
+          <div style="background:var(--cream);border-radius:var(--radius);padding:0.75rem 1.1rem;box-shadow:var(--shadow);min-width:160px;">
+            <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;color:var(--navy);font-size:1rem;">Fidel Irizarry</div>
+            <div style="color:var(--copper);font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Rosario, Puerto Rico</div>
+          </div>
+          <div style="background:var(--cream);border-radius:var(--radius);padding:0.75rem 1.1rem;box-shadow:var(--shadow);min-width:160px;">
+            <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;color:var(--navy);font-size:1rem;">Christopher Koch</div>
+            <div style="color:var(--copper);font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Frederick, MD</div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== RACER BIOS =====
+         HOW TO ADD A RACER BIO:
+         1. Copy one <article class="racer-bio-card"> block from the TEMPLATE comment below.
+         2. Paste it inside the "racer-bios-list" div.
+         3. Fill in all fields. Delete any optional field rows that weren't provided.
+         4. Remove the "empty-state" div once you have at least one bio.
+         5. Keep bios in the same order as the roster above.
+    ============================================================ -->
+    <section class="section" style="background:var(--cream);">
+      <div class="container">
+
+        <h2 class="section-heading" style="margin-bottom:2rem;">Racer Bios</h2>
+
+        <!-- EMPTY STATE: delete this block once you've added at least one bio -->
+        <div id="bio-empty-state" style="background:var(--white);border-radius:var(--radius);padding:2rem;text-align:center;color:var(--text-mid);">
+          <p style="margin:0;">Bios will appear here as racers submit them. <a href="racers.html#bio">Submit your bio.</a></p>
+        </div>
+
+        <!--
+          RACER BIO CARD TEMPLATE — paste copies inside the list div below.
+          Delete any rows that the racer didn't fill in (bike brand, wheel size, fun fact are optional).
+
+          <article style="background:var(--white);border-radius:var(--radius);padding:2rem;box-shadow:var(--shadow);margin-bottom:1.5rem;">
+            <div style="display:flex;align-items:baseline;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem;">
+              <h3 style="color:var(--navy);margin:0;">First Last</h3>
+              <span style="color:var(--copper);font-size:0.85rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">City, ST</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.5rem 1.5rem;margin-bottom:1.25rem;">
+              <div>
+                <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-mid);font-weight:600;">Riding Since</span>
+                <div style="color:var(--navy);font-weight:500;">X years</div>
+              </div>
+              <div>
+                <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-mid);font-weight:600;">Bike</span>
+                <div style="color:var(--navy);font-weight:500;">Brand / Make</div>
+              </div>
+              <div>
+                <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-mid);font-weight:600;">Front Wheel</span>
+                <div style="color:var(--navy);font-weight:500;">52"</div>
+              </div>
+            </div>
+            <div style="margin-bottom:1rem;">
+              <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-mid);font-weight:600;display:block;margin-bottom:0.25rem;">How they got into penny farthing riding</span>
+              <p style="color:var(--text-dark);margin:0;">Origin story text here.</p>
+            </div>
+            <div>
+              <span style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-mid);font-weight:600;display:block;margin-bottom:0.25rem;">Fun fact</span>
+              <p style="color:var(--text-dark);margin:0;">Fun fact text here.</p>
+            </div>
+          </article>
+        -->
+        <div id="racer-bios-list">
+          <!-- RACER BIO CARDS GO HERE -->
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ===== CTA ===== -->
+    <section class="section" style="background:var(--navy);text-align:center;">
+      <div class="container">
+        <h2 style="color:var(--cream);margin-bottom:0.75rem;">Ready to Race?</h2>
+        <p style="color:rgba(245,240,232,0.8);margin-bottom:2rem;max-width:480px;margin-left:auto;margin-right:auto;">Spots are limited. Register today and claim your place in the inaugural Ohio High Wheel Race.</p>
+        <a href="racerregistration.html" class="btn btn-primary">Register for the Race</a>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="footer-slot"></div>
+  <script src="js/main.js"></script>
+</body>
+</html>
