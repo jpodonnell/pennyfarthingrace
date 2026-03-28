@@ -93,8 +93,8 @@ const FOOTER_HTML = `
       <h4>Quick Links</h4>
       <a href="index.html">Home</a>
       <a href="about.html">About</a>
-      <a href="racerregistration.html">Racer Registration</a>
-      <a href="registered-racers.html">Registered Racers</a>
+      <a href="racerregistration.html">Race Registration</a>
+      <a href="registered-racers.html">Racers Registered</a>
       <a href="info.html">Info</a>
       <a href="volunteer.html">Volunteer</a>
       <a href="sponsors.html">Sponsors</a>
