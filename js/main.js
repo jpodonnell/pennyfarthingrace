@@ -70,8 +70,8 @@ const HEADER_HTML = `
       <ul class="nav-links" id="nav-links">
         <li><a href="index.html">Home</a></li>
         <li><a href="about.html">About</a></li>
-        <li><a href="racerregistration.html">Registration</a></li>
-        <li><a href="registered-racers.html">Racers</a></li>
+        <li><a href="racerregistration.html">Race Registration</a></li>
+        <li><a href="registered-racers.html">Racers Registered</a></li>
         <li><a href="info.html">Info</a></li>
         <li><a href="volunteer.html">Volunteer</a></li>
         <li><a href="sponsors.html">Sponsors</a></li>

@@ -164,8 +164,10 @@ p:last-child { margin-bottom: 0; }
 }
 .nav-links {
   display: flex;
-  gap: 2rem;
+  gap: 1rem 1.5rem;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .nav-links a {
   color: rgba(255,255,255,0.85);
