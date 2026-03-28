@@ -72,7 +72,7 @@ const HEADER_HTML = `
         <li><a href="about.html">About</a></li>
         <li><a href="racerregistration.html">Registration</a></li>
         <li><a href="registered-racers.html">Racers</a></li>
-        <li><a href="info.html">Info &amp; Directions</a></li>
+        <li><a href="info.html">Info</a></li>
         <li><a href="volunteer.html">Volunteer</a></li>
         <li><a href="sponsors.html">Sponsors</a></li>
       </ul>
@@ -95,7 +95,7 @@ const FOOTER_HTML = `
       <a href="about.html">About</a>
       <a href="racerregistration.html">Racer Registration</a>
       <a href="registered-racers.html">Registered Racers</a>
-      <a href="info.html">Info &amp; Directions</a>
+      <a href="info.html">Info</a>
       <a href="volunteer.html">Volunteer</a>
       <a href="sponsors.html">Sponsors</a>
     </div>
