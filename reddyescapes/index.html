@@ -1,0 +1,3895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reddy's Great Escape</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Courier New', monospace;
+  }
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    background: #87ceeb;
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="game" width="480" height="270"></canvas>
+<script>
+'use strict';
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const VW = 480;
+const VH = 270;
+const GRAVITY = 0.4;
+const JUMP_V = -9;
+const WALK_SPEED = 2;
+const CLIMB_SPEED = 1.5;
+const LEVEL_W = 3840;
+const GROUND_Y = 200;
+const IFRAMES = 90; // 1.5s at 60fps
+
+const STATE = { TITLE: 0, PLAYING: 1, GAMEOVER: 2, WIN: 3, STORY: 4, MAP: 5, GAMEWIN: 6, PAUSED: 7 };
+
+// ============================================================
+// CANVAS / SCALING
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+ctx.imageSmoothingEnabled = false;
+
+function resize() {
+  const sw = window.innerWidth;
+  const sh = window.innerHeight;
+  let scale = Math.min(sw / VW, sh / VH);
+  if (scale >= 1) scale = Math.floor(scale);
+  canvas.style.width = (VW * scale) + 'px';
+  canvas.style.height = (VH * scale) + 'px';
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ============================================================
+// COLORS
+// ============================================================
+const COL = {
+  RUST: '#a84a32',
+  RUST_LT: '#c45a3a',
+  DARK: '#6e2a18',
+  CREAM: '#f4d8a8',
+  ORANGE: '#e87a30',
+  WHITE: '#ffffff',
+  BLACK: '#1a1010',
+
+  SKY_TOP: '#7ec0ee',
+  SKY_BOT: '#bce3f5',
+  HILL_FAR: '#7aa848',
+  HILL_NEAR: '#8cba56',
+  CLOUD: '#ffffff',
+
+  GRASS: '#5cba4a',
+  GRASS_DK: '#3a8a30',
+  GRASS_BLADE: '#7ada5a',
+  DIRT: '#7a4a2a',
+  DIRT_DK: '#5a3a1a',
+  DIRT_LT: '#9a6a3a',
+
+  WATER: '#3b82c4',
+  WATER_LT: '#5ba2e4',
+  WATER_DK: '#1b5294',
+
+  ROCK: '#9a9a9a',
+  ROCK_DK: '#5a5a5a',
+  ROCK_LT: '#bababa',
+
+  LOG: '#8b5a2b',
+  LOG_DK: '#5b3a1b',
+  LOG_LT: '#ab7a4b',
+
+  BOX: '#c89050',
+  BOX_DK: '#88501c',
+  BOX_LT: '#e0a868',
+  LADDER: '#6a3a1a',
+
+  STUMP: '#7a4a2a',
+  STUMP_TOP: '#a06a3c',
+  STUMP_RING: '#5a3a1a',
+
+  GOLD: '#fbd02c',
+  GOLD_DK: '#b8800c',
+  GOLD_LT: '#ffe874',
+
+  BAMBOO: '#5cba4a',
+  BAMBOO_DK: '#2a6a20',
+
+  FRUIT: '#e84a3a',
+  FRUIT_DK: '#a8201a',
+  LEAF: '#3a8a30',
+
+  FENCE: '#9a6a3a',
+  FENCE_DK: '#5a3a1a',
+
+  BRANCH: '#5b3a1b',
+  BRANCH_LEAF: '#3a8a30',
+
+  DEN: '#1a1010',
+  DEN_RIM: '#3a2a1a',
+  HILL_DEN: '#7ada5a'
+};
+
+// ============================================================
+// AUDIO ENGINE (Web Audio API)
+// ============================================================
+const NOTE = {
+  REST: 0,
+  C2: 65.41, D2: 73.42, E2: 82.41, F2: 87.31, G2: 98.00, A2: 110.00, As2: 116.54, B2: 123.47,
+  C3: 130.81, Cs3: 138.59, D3: 146.83, Ds3: 155.56, E3: 164.81, F3: 174.61, Fs3: 185.00,
+  G3: 196.00, Gs3: 207.65, A3: 220.00, As3: 233.08, B3: 246.94,
+  C4: 261.63, Cs4: 277.18, D4: 293.66, Ds4: 311.13, E4: 329.63, F4: 349.23, Fs4: 369.99,
+  G4: 392.00, Gs4: 415.30, A4: 440.00, As4: 466.16, B4: 493.88,
+  C5: 523.25, Cs5: 554.37, D5: 587.33, Ds5: 622.25, E5: 659.25, F5: 698.46, Fs5: 739.99,
+  G5: 783.99, Gs5: 830.61, A5: 880.00, As5: 932.33, B5: 987.77,
+  C6: 1046.50, D6: 1174.66, E6: 1318.51, F6: 1396.91, G6: 1567.98
+};
+
+const audio = {
+  ctx: null,
+  master: null,
+  musicGain: null,
+  sfxGain: null,
+  enabled: true,
+  muted: false,
+  normalGain: 0.55,
+  currentTrackName: null,
+  loopHandle: null,
+  loopStart: 0
+};
+
+function audioInit() {
+  if (audio.ctx) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    audio.ctx = new Ctx();
+    audio.master = audio.ctx.createGain();
+    audio.master.gain.value = 0.55;
+    audio.master.connect(audio.ctx.destination);
+    audio.musicGain = audio.ctx.createGain();
+    audio.musicGain.gain.value = 0.6;
+    audio.musicGain.connect(audio.master);
+    audio.sfxGain = audio.ctx.createGain();
+    audio.sfxGain.gain.value = 0.7;
+    audio.sfxGain.connect(audio.master);
+  } catch (e) {
+    audio.enabled = false;
+  }
+}
+
+function audioResume() {
+  if (!audio.ctx) audioInit();
+  if (audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();
+}
+
+function toggleMute() {
+  audio.muted = !audio.muted;
+  if (audio.master) {
+    audio.master.gain.value = audio.muted ? 0 : audio.normalGain;
+  }
+}
+
+function tone(freq, startTime, duration, type, gainNode, peakGain) {
+  if (!audio.ctx || !audio.enabled) return;
+  if (!freq || freq <= 0) return;
+  const osc = audio.ctx.createOscillator();
+  osc.type = type;
+  osc.frequency.value = freq;
+  const g = audio.ctx.createGain();
+  g.gain.setValueAtTime(0, startTime);
+  g.gain.linearRampToValueAtTime(peakGain, startTime + 0.005);
+  g.gain.linearRampToValueAtTime(peakGain * 0.7, startTime + duration * 0.5);
+  g.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(g);
+  g.connect(gainNode);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.02);
+}
+
+function playSfx(type) {
+  if (!audio.ctx || !audio.enabled) return;
+  const t = audio.ctx.currentTime;
+  if (type === 'jump') {
+    const o = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(220, t);
+    o.frequency.exponentialRampToValueAtTime(660, t + 0.10);
+    g.gain.setValueAtTime(0.20, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    o.connect(g); g.connect(audio.sfxGain);
+    o.start(t); o.stop(t + 0.13);
+  } else if (type === 'land') {
+    const o = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    o.type = 'square';
+    o.frequency.setValueAtTime(140, t);
+    o.frequency.exponentialRampToValueAtTime(70, t + 0.06);
+    g.gain.setValueAtTime(0.15, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    o.connect(g); g.connect(audio.sfxGain);
+    o.start(t); o.stop(t + 0.08);
+  } else if (type === 'hit') {
+    const o = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, t);
+    o.frequency.linearRampToValueAtTime(60, t + 0.20);
+    g.gain.setValueAtTime(0.25, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    o.connect(g); g.connect(audio.sfxGain);
+    o.start(t); o.stop(t + 0.23);
+  } else if (type === 'coin') {
+    tone(NOTE.C6, t,        0.05, 'square', audio.sfxGain, 0.18);
+    tone(NOTE.E6, t + 0.05, 0.08, 'square', audio.sfxGain, 0.18);
+  } else if (type === 'food') {
+    tone(NOTE.G5, t,        0.10, 'triangle', audio.sfxGain, 0.20);
+    tone(NOTE.C6, t + 0.10, 0.12, 'triangle', audio.sfxGain, 0.20);
+  } else if (type === 'duck') {
+    const o = audio.ctx.createOscillator();
+    const g = audio.ctx.createGain();
+    o.type = 'square';
+    o.frequency.value = 150;
+    g.gain.setValueAtTime(0.10, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+    o.connect(g); g.connect(audio.sfxGain);
+    o.start(t); o.stop(t + 0.07);
+  } else if (type === 'level_complete') {
+    const seq = [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6];
+    for (let i = 0; i < seq.length; i++) {
+      tone(seq[i], t + i * 0.12, 0.13, 'square', audio.sfxGain, 0.18);
+    }
+  } else if (type === 'game_over') {
+    const seq = [NOTE.G4, NOTE.E4, NOTE.C4, NOTE.G3];
+    for (let i = 0; i < seq.length; i++) {
+      tone(seq[i], t + i * 0.18, 0.22, 'sawtooth', audio.sfxGain, 0.18);
+    }
+  } else if (type === 'win') {
+    const seq = [NOTE.C5, NOTE.E5, NOTE.G5, NOTE.C6, NOTE.E6, NOTE.G6];
+    for (let i = 0; i < seq.length; i++) {
+      tone(seq[i], t + i * 0.14, 0.16, 'square', audio.sfxGain, 0.20);
+      tone(seq[i] * 0.5, t + i * 0.14, 0.16, 'triangle', audio.sfxGain, 0.18);
+    }
+  }
+}
+
+// Music tracks — each has melody (square) + bass (triangle), 32 beats/loop
+const TRACKS = {
+  level1: { bpm: 110, melody: [
+    ['C5',1],['E5',1],['G5',1],['E5',1],['F5',1],['D5',1],['C5',1],['REST',1],
+    ['C5',1],['E5',1],['G5',1],['C6',1],['B5',1],['G5',1],['E5',1],['REST',1],
+    ['A4',1],['C5',1],['E5',1],['C5',1],['G4',1],['B4',1],['D5',1],['REST',1],
+    ['C5',1],['E5',1],['G5',1],['E5',1],['D5',1],['C5',2],['REST',1]
+  ], bass: [
+    ['C3',2],['G3',2],['F3',2],['G3',2],
+    ['C3',2],['G3',2],['F3',2],['G3',2],
+    ['A2',2],['E3',2],['G2',2],['D3',2],
+    ['C3',2],['G3',2],['C3',4]
+  ]},
+  level2: { bpm: 130, melody: [
+    ['G4',1],['B4',1],['D5',1],['G5',1],['E5',1],['D5',1],['B4',1],['G4',1],
+    ['A4',1],['C5',1],['E5',1],['A5',1],['G5',1],['E5',1],['C5',1],['A4',1],
+    ['F5',1],['E5',1],['D5',1],['C5',1],['B4',1],['A4',1],['G4',2],
+    ['G4',1],['B4',1],['D5',1],['G5',1],['F5',1],['D5',1],['G4',2]
+  ], bass: [
+    ['G2',2],['D3',2],['A2',2],['E3',2],
+    ['F3',2],['C3',2],['G2',2],['G3',2],
+    ['G2',2],['D3',2],['A2',2],['G2',2],
+    ['G2',2],['D3',2],['G2',4]
+  ]},
+  level3: { bpm: 100, melody: [
+    ['A4',1],['C5',1],['E5',1],['A4',1],['G4',1],['F4',1],['E4',1],['REST',1],
+    ['A4',1],['C5',1],['E5',1],['G5',1],['F5',1],['E5',1],['C5',1],['REST',1],
+    ['D5',1],['F5',1],['A5',1],['F5',1],['E5',1],['C5',1],['A4',2],
+    ['As4',1],['A4',1],['G4',1],['F4',1],['E4',1],['F4',1],['A4',2]
+  ], bass: [
+    ['A2',2],['E3',2],['F2',2],['C3',2],
+    ['A2',2],['E3',2],['D3',2],['A2',2],
+    ['A2',2],['E3',2],['G2',2],['A2',2],
+    ['A2',2],['E3',2],['A2',4]
+  ]},
+  level4: { bpm: 150, melody: [
+    ['C5',1],['REST',1],['G5',1],['REST',1],['E5',1],['REST',1],['G5',1],['C5',1],
+    ['F5',1],['E5',1],['D5',1],['C5',1],['G4',1],['C5',1],['E5',1],['G5',1],
+    ['A5',1],['G5',1],['E5',1],['C5',1],['D5',1],['E5',1],['F5',2],
+    ['C5',1],['E5',1],['G5',1],['C6',1],['B5',1],['G5',1],['C5',2]
+  ], bass: [
+    ['C3',2],['G3',2],['F3',2],['G3',2],
+    ['C3',2],['E3',2],['F3',2],['G3',2],
+    ['A2',2],['E3',2],['F3',2],['G3',2],
+    ['C3',2],['G3',2],['C3',4]
+  ]},
+  level5: { bpm: 115, melody: [
+    ['F4',1],['A4',1],['C5',1],['F5',1],['E5',1],['D5',1],['C5',1],['REST',1],
+    ['G4',1],['B4',1],['D5',1],['G5',1],['F5',1],['E5',1],['D5',1],['REST',1],
+    ['A4',1],['C5',1],['F5',1],['A5',1],['G5',1],['F5',1],['C5',2],
+    ['F4',1],['A4',1],['C5',1],['F5',1],['E5',1],['C5',1],['F4',2]
+  ], bass: [
+    ['F2',2],['C3',2],['As2',2],['C3',2],
+    ['G2',2],['D3',2],['F3',2],['C3',2],
+    ['F2',2],['A2',2],['C3',2],['F3',2],
+    ['F2',2],['C3',2],['F2',4]
+  ]},
+  level6: { bpm: 120, melody: [
+    ['D5',1],['F5',1],['A5',1],['F5',1],['E5',1],['D5',1],['REST',2],
+    ['C5',1],['E5',1],['G5',1],['E5',1],['D5',1],['C5',1],['REST',2],
+    ['G4',1],['B4',1],['D5',1],['G5',1],['A5',1],['G5',1],['F5',2],
+    ['D5',1],['F5',1],['A5',1],['F5',1],['D5',1],['F5',1],['D5',2]
+  ], bass: [
+    ['D3',2],['A2',2],['G2',2],['A2',2],
+    ['C3',2],['G3',2],['F3',2],['C3',2],
+    ['G2',2],['D3',2],['D3',2],['A2',2],
+    ['D3',2],['A2',2],['D3',4]
+  ]},
+  level7: { bpm: 160, melody: [
+    ['E5',1],['D5',1],['C5',1],['B4',1],['A4',1],['B4',1],['C5',1],['D5',1],
+    ['E5',1],['G5',1],['B5',1],['G5',1],['A5',1],['G5',1],['E5',1],['REST',1],
+    ['F5',1],['E5',1],['D5',1],['C5',1],['B4',1],['A4',1],['REST',2],
+    ['A4',1],['C5',1],['E5',1],['A5',1],['G5',1],['E5',1],['A4',2]
+  ], bass: [
+    ['A2',1],['A2',1],['E3',2],['F2',1],['F2',1],['C3',2],
+    ['A2',1],['A2',1],['E3',2],['G2',1],['G2',1],['A2',2],
+    ['A2',1],['A2',1],['E3',2],['F2',1],['F2',1],['C3',2],
+    ['A2',1],['A2',1],['E3',2],['A2',1],['A2',1],['A2',2]
+  ]},
+  level8: { bpm: 90, melody: [
+    ['D5',2],['F5',1],['A5',1],['G5',2],['F5',2],
+    ['E5',2],['D5',1],['C5',1],['D5',4],
+    ['F5',2],['A5',1],['C6',1],['B5',2],['A5',2],
+    ['G5',2],['F5',2],['D5',4]
+  ], bass: [
+    ['D3',4],['G3',4],
+    ['A2',4],['D3',4],
+    ['F3',4],['C3',4],
+    ['D3',4],['D3',4]
+  ]},
+  level9: { bpm: 100, melody: [
+    ['E5',2],['G5',1],['A5',1],['B5',2],['A5',1],['G5',1],
+    ['F5',2],['E5',1],['D5',1],['E5',4],
+    ['C6',2],['B5',1],['A5',1],['G5',2],['F5',2],
+    ['E5',2],['D5',2],['E5',4]
+  ], bass: [
+    ['E2',2],['B2',2],['A2',2],['E3',2],
+    ['F2',2],['C3',2],['E2',2],['E3',2],
+    ['A2',2],['E3',2],['F2',2],['C3',2],
+    ['E2',2],['B2',2],['E2',4]
+  ]},
+  level10: { bpm: 105, melody: [
+    ['C5',1],['E5',1],['G5',1],['C6',1],['B5',1],['A5',1],['G5',1],['REST',1],
+    ['F5',1],['A5',1],['C6',1],['F6',1],['E6',1],['D6',1],['C6',1],['REST',1],
+    ['G5',1],['B5',1],['D6',1],['B5',1],['A5',1],['G5',1],['F5',1],['E5',1],
+    ['D5',1],['F5',1],['A5',1],['C6',1],['G5',1],['E5',1],['C5',2]
+  ], bass: [
+    ['C3',2],['G3',2],['F3',2],['C3',2],
+    ['F3',2],['C3',2],['F3',2],['C3',2],
+    ['G2',2],['D3',2],['F3',2],['C3',2],
+    ['F3',2],['G3',2],['C3',4]
+  ]}
+};
+
+function startMusic(trackName) {
+  stopMusic();
+  if (!audio.ctx) audioInit();
+  if (!audio.ctx) return;
+  const track = TRACKS[trackName];
+  if (!track) return;
+  audio.currentTrackName = trackName;
+  audio.loopStart = audio.ctx.currentTime + 0.1;
+  // restore music gain (stopMusic silenced it)
+  audio.musicGain.gain.cancelScheduledValues(audio.ctx.currentTime);
+  audio.musicGain.gain.setValueAtTime(0.6, audio.ctx.currentTime);
+  scheduleTrackLoop();
+}
+
+function scheduleTrackLoop() {
+  if (!audio.ctx) return;
+  const trackName = audio.currentTrackName;
+  if (!trackName) return;
+  const track = TRACKS[trackName];
+  if (!track) return;
+
+  const beat = 60 / track.bpm / 2;
+  const startTime = Math.max(audio.ctx.currentTime + 0.02, audio.loopStart);
+
+  // Melody (square)
+  let mt = startTime;
+  for (let i = 0; i < track.melody.length; i++) {
+    const [n, dur] = track.melody[i];
+    const f = NOTE[n];
+    if (f && f > 0) tone(f, mt, dur * beat * 0.95, 'square', audio.musicGain, 0.05);
+    mt += dur * beat;
+  }
+  // Bass (triangle)
+  let bt = startTime;
+  for (let i = 0; i < track.bass.length; i++) {
+    const [n, dur] = track.bass[i];
+    const f = NOTE[n];
+    if (f && f > 0) tone(f, bt, dur * beat * 0.95, 'triangle', audio.musicGain, 0.10);
+    bt += dur * beat;
+  }
+  const loopEnd = Math.max(mt, bt);
+  audio.loopStart = loopEnd;
+  const msToNext = (loopEnd - audio.ctx.currentTime) * 1000 - 100;
+  audio.loopHandle = setTimeout(scheduleTrackLoop, Math.max(50, msToNext));
+}
+
+function stopMusic() {
+  if (audio.loopHandle) {
+    clearTimeout(audio.loopHandle);
+    audio.loopHandle = null;
+  }
+  audio.currentTrackName = null;
+  // Silence currently-scheduled music notes by ducking the music gain
+  if (audio.musicGain && audio.ctx) {
+    audio.musicGain.gain.cancelScheduledValues(audio.ctx.currentTime);
+    audio.musicGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+  }
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+const keys = {};
+const keyPressed = {};
+window.addEventListener('keydown', (e) => {
+  audioResume();
+  if (!keys[e.code]) keyPressed[e.code] = true;
+  keys[e.code] = true;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','Escape','KeyP','KeyM'].indexOf(e.code) >= 0) {
+    e.preventDefault();
+  }
+  if (e.code === 'KeyM') toggleMute();
+});
+window.addEventListener('keyup', (e) => { keys[e.code] = false; });
+window.addEventListener('mousedown', audioResume);
+window.addEventListener('touchstart', audioResume, { passive: true });
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let gameState = STATE.TITLE;
+let prevState = STATE.TITLE;
+let stateTimer = 0;
+let score = 0;
+let frameCount = 0;
+let camera = { x: 0 };
+
+const player = {
+  x: 50, y: GROUND_Y - 24,
+  vx: 0, vy: 0,
+  w: 12, h: 24,
+  health: 100,
+  facing: 1,
+  state: 'idle',
+  animFrame: 0,
+  animTimer: 0,
+  ducking: false,
+  onGround: true,
+  climbing: false,
+  swimming: false,
+  invincible: 0,
+  lastSafeX: 50,
+  lastSafeY: GROUND_Y - 24
+};
+
+function resetPlayer() {
+  player.x = 50;
+  player.y = GROUND_Y - 24;
+  player.vx = 0; player.vy = 0;
+  player.health = 100;
+  player.facing = 1;
+  player.state = 'idle';
+  player.animFrame = 0;
+  player.animTimer = 0;
+  player.ducking = false;
+  player.onGround = true;
+  player.climbing = false;
+  player.swimming = false;
+  player.invincible = 0;
+  player.lastSafeX = 50;
+  player.lastSafeY = GROUND_Y - 24;
+}
+
+// ============================================================
+// LEVEL 1 - ZOO ENCLOSURE
+// ============================================================
+let groundSegs = [
+  [0, 1900],
+  [1960, 3400],
+  [3450, LEVEL_W]
+];
+
+let obstacles = [
+  { type: 'rock',   x: 380,  y: GROUND_Y - 12, w: 16, h: 12 },
+  { type: 'rock',   x: 620,  y: GROUND_Y - 14, w: 22, h: 14 },
+  { type: 'log',    x: 900,  y: GROUND_Y - 16, w: 36, h: 16 },
+  { type: 'log',    x: 1180, y: GROUND_Y - 16, w: 40, h: 16 },
+  { type: 'box',    x: 1500, y: GROUND_Y - 32, w: 32, h: 32 },
+  { type: 'stream', x: 1900, y: GROUND_Y,      w: 60, h: 20 },
+  { type: 'stump',  x: 2300, y: GROUND_Y - 24, w: 32, h: 24 },
+  { type: 'rock',   x: 2600, y: GROUND_Y - 12, w: 18, h: 12 },
+  { type: 'branch', x: 2900, y: 176,           w: 44, h: 8  },
+  { type: 'log',    x: 3150, y: GROUND_Y - 16, w: 40, h: 16 },
+  { type: 'stream', x: 3400, y: GROUND_Y,      w: 50, h: 20 },
+  { type: 'den',    x: 3680, y: GROUND_Y - 50, w: 60, h: 50 }
+];
+
+let collectibles = [
+  { type: 'coin',   x: 200,  y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 280,  y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 480,  y: GROUND_Y - 50, taken: false },
+  { type: 'coin',   x: 540,  y: GROUND_Y - 60, taken: false },
+  { type: 'bamboo', x: 750,  y: GROUND_Y - 14, taken: false },
+  { type: 'coin',   x: 1050, y: GROUND_Y - 50, taken: false },
+  { type: 'coin',   x: 1290, y: GROUND_Y - 56, taken: false },
+  { type: 'coin',   x: 1380, y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 1516, y: GROUND_Y - 60, taken: false },
+  { type: 'fruit',  x: 1750, y: GROUND_Y - 14, taken: false },
+  { type: 'coin',   x: 1930, y: GROUND_Y - 64, taken: false },
+  { type: 'coin',   x: 2150, y: GROUND_Y - 30, taken: false },
+  { type: 'bamboo', x: 2316, y: GROUND_Y - 38, taken: false },
+  { type: 'coin',   x: 2480, y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 2750, y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 2920, y: GROUND_Y - 14, taken: false },
+  { type: 'fruit',  x: 3060, y: GROUND_Y - 14, taken: false },
+  { type: 'coin',   x: 3280, y: GROUND_Y - 30, taken: false },
+  { type: 'coin',   x: 3425, y: GROUND_Y - 64, taken: false },
+  { type: 'coin',   x: 3560, y: GROUND_Y - 30, taken: false }
+];
+
+let obstaclesPassed = new Set();
+
+// ============================================================
+// LEVEL SYSTEM (PHASE 2/3)
+// ============================================================
+let currentLevel = 1;
+let levelsCompleted = new Set();
+let storyPanel = 0;
+let storyShown = false; // track if intro was shown
+
+const LEVEL_META = [
+  null,
+  { name: 'ZOO ENCLOSURE', theme: 'zoo',         track: 'level1' },
+  { name: 'ZOO GROUNDS',   theme: 'zoo2',        track: 'level2' },
+  { name: 'CITY ALLEY',    theme: 'city_alley',  track: 'level3' },
+  { name: 'CITY STREET',   theme: 'city_street', track: 'level4' },
+  { name: 'CITY PARK',     theme: 'park',        track: 'level5' },
+  { name: 'SUBURBS',       theme: 'suburbs',     track: 'level6' },
+  { name: 'HIGHWAY',       theme: 'highway',     track: 'level7' },
+  { name: 'FOREST EDGE',   theme: 'forest',      track: 'level8' },
+  { name: 'MOUNTAIN PATH', theme: 'mountain',    track: 'level9' },
+  { name: 'HOME DEN',      theme: 'deep_forest', track: 'level10' }
+];
+
+function deepCopy(arr) { return JSON.parse(JSON.stringify(arr)); }
+
+const LEVEL1_INIT = {
+  obstacles: deepCopy(obstacles),
+  collectibles: deepCopy(collectibles),
+  groundSegs: deepCopy(groundSegs)
+};
+
+// --- Level builders ---
+function buildLevel2() {
+  // ZOO GROUNDS — all stationary, denser than L1
+  const grounds = [[0, 1720], [1780, 2680], [2740, 3300], [3360, LEVEL_W]];
+  const o = [];
+  o.push({type: 'rock',   x: 240,  y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'log',    x: 400,  y: GROUND_Y - 16, w: 36, h: 16, dmg: 15});
+  o.push({type: 'rock',   x: 560,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'fence',  x: 720,  y: GROUND_Y - 32, w: 14, h: 32, dmg: 15});
+  o.push({type: 'box',    x: 880,  y: GROUND_Y - 32, w: 32, h: 32, dmg: 5});
+  o.push({type: 'log',    x: 1060, y: GROUND_Y - 16, w: 40, h: 16, dmg: 15});
+  o.push({type: 'rock',   x: 1230, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'fence',  x: 1380, y: GROUND_Y - 32, w: 14, h: 32, dmg: 15});
+  o.push({type: 'box',    x: 1540, y: GROUND_Y - 32, w: 32, h: 32, dmg: 5});
+  o.push({type: 'stream', x: 1720, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',   x: 1830, y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'log',    x: 1990, y: GROUND_Y - 16, w: 40, h: 16, dmg: 15});
+  o.push({type: 'fence',  x: 2160, y: GROUND_Y - 32, w: 14, h: 32, dmg: 15});
+  o.push({type: 'rock',   x: 2300, y: GROUND_Y - 14, w: 20, h: 14, dmg: 15});
+  o.push({type: 'box',    x: 2470, y: GROUND_Y - 32, w: 32, h: 32, dmg: 5});
+  o.push({type: 'log',    x: 2620, y: GROUND_Y - 16, w: 36, h: 16, dmg: 15});
+  o.push({type: 'stream', x: 2680, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',   x: 2810, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'fence',  x: 2960, y: GROUND_Y - 32, w: 14, h: 32, dmg: 15});
+  o.push({type: 'log',    x: 3110, y: GROUND_Y - 16, w: 40, h: 16, dmg: 15});
+  o.push({type: 'box',    x: 3220, y: GROUND_Y - 32, w: 32, h: 32, dmg: 5});
+  o.push({type: 'stream', x: 3300, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',   x: 3450, y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'den',    x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  const coinSpots = [180, 320, 480, 640, 800, 1000, 1180, 1340, 1480, 1660, 1820, 1900, 2080, 2240, 2400, 2560, 2700, 2880, 3060, 3200, 3300, 3460, 3550];
+  for (let i = 0; i < coinSpots.length; i++) {
+    c.push({type: 'coin', x: coinSpots[i], y: GROUND_Y - 30 - (i % 3) * 16, taken: false});
+  }
+  c.push({type: 'bamboo', x: 600,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1100, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1900, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 2900, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel3() {
+  // CITY ALLEY — first moving obstacles (slow trash cans), puddles
+  const grounds = [[0, 1500], [1560, 2400], [2460, 3200], [3260, LEVEL_W]];
+  const o = [];
+  o.push({type: 'trashcan', x: 240,  y: GROUND_Y - 22, w: 18, h: 22, dmg: 5});
+  o.push({type: 'rock',     x: 380,  y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'dumpster', x: 520,  y: GROUND_Y - 28, w: 40, h: 28, dmg: 5});
+  o.push({type: 'trashcan', x: 700,  y: GROUND_Y - 22, w: 18, h: 22, dmg: 5,
+          mv: {type: 'patrol', baseX: 700, range: 40, speed: 0.5, dir: 1}});
+  o.push({type: 'rock',     x: 850,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'dumpster', x: 1000, y: GROUND_Y - 28, w: 40, h: 28, dmg: 5});
+  o.push({type: 'trashcan', x: 1180, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5});
+  o.push({type: 'rock',     x: 1280, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'trashcan', x: 1400, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5,
+          mv: {type: 'patrol', baseX: 1400, range: 40, speed: 0.5, dir: -1}});
+  o.push({type: 'puddle',   x: 1500, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'dumpster', x: 1620, y: GROUND_Y - 28, w: 40, h: 28, dmg: 5});
+  o.push({type: 'trashcan', x: 1800, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5});
+  o.push({type: 'rock',     x: 1940, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'trashcan', x: 2080, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5,
+          mv: {type: 'patrol', baseX: 2080, range: 40, speed: 0.5, dir: 1}});
+  o.push({type: 'dumpster', x: 2240, y: GROUND_Y - 28, w: 40, h: 28, dmg: 5});
+  o.push({type: 'puddle',   x: 2400, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'trashcan', x: 2520, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5});
+  o.push({type: 'rock',     x: 2660, y: GROUND_Y - 14, w: 20, h: 14, dmg: 15});
+  o.push({type: 'dumpster', x: 2820, y: GROUND_Y - 28, w: 40, h: 28, dmg: 5});
+  o.push({type: 'trashcan', x: 3000, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5,
+          mv: {type: 'patrol', baseX: 3000, range: 40, speed: 0.6, dir: 1}});
+  o.push({type: 'puddle',   x: 3200, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',     x: 3340, y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'trashcan', x: 3480, y: GROUND_Y - 22, w: 18, h: 22, dmg: 5});
+  o.push({type: 'den',      x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  const xs = [180, 320, 460, 600, 760, 900, 1060, 1240, 1340, 1520, 1700, 1860, 2000, 2140, 2300, 2440, 2580, 2720, 2880, 3080, 3220, 3400, 3560];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  c.push({type: 'bamboo', x: 580,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1620, y: GROUND_Y - 60, taken: false});
+  c.push({type: 'bamboo', x: 2240, y: GROUND_Y - 60, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel4() {
+  // CITY STREET — fast moving cars, parked cars, hydrants, newsstands
+  const grounds = [[0, LEVEL_W]]; // street is solid
+  const o = [];
+  o.push({type: 'hydrant',   x: 220,  y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 360,  y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 520,  y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 720,  y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 860,  y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 1020, y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 1220, y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 1380, y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 1540, y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 1760, y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 1900, y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 2060, y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 2260, y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 2420, y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 2580, y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 2780, y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 2940, y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  o.push({type: 'parked_car',x: 3100, y: GROUND_Y - 26, w: 50, h: 26, dmg: 5});
+  o.push({type: 'hydrant',   x: 3300, y: GROUND_Y - 18, w: 12, h: 18, dmg: 10});
+  o.push({type: 'newsstand', x: 3450, y: GROUND_Y - 26, w: 22, h: 26, dmg: 10});
+  // moving cars (drive across the road) — at a "lane" between obstacles
+  const carLane = GROUND_Y - 18;
+  o.push({type: 'car', x: 600,  y: carLane, w: 44, h: 18, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.5}});
+  o.push({type: 'car', x: 1400, y: carLane, w: 44, h: 18, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.5}});
+  o.push({type: 'car', x: 2200, y: carLane, w: 44, h: 18, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.6}});
+  o.push({type: 'car', x: 3000, y: carLane, w: 44, h: 18, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.7}});
+  o.push({type: 'den', x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  const xs = [160, 280, 460, 620, 780, 920, 1080, 1220, 1320, 1460, 1640, 1780, 1980, 2120, 2300, 2480, 2620, 2820, 2980, 3140, 3340, 3520, 3580];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  c.push({type: 'fruit',  x: 720,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1740, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 2760, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel5() {
+  // CITY PARK — benches, hedges, ponds, mix moving
+  const grounds = [[0, 1700], [1760, 2700], [2760, 3300], [3360, LEVEL_W]];
+  const o = [];
+  o.push({type: 'rock',  x: 220,  y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'hedge', x: 360,  y: GROUND_Y - 14, w: 40, h: 14, dmg: 5});
+  o.push({type: 'bench', x: 500,  y: GROUND_Y - 18, w: 44, h: 18, dmg: 5});
+  o.push({type: 'rock',  x: 660,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'hedge', x: 800,  y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'bench', x: 940,  y: GROUND_Y - 18, w: 44, h: 18, dmg: 5});
+  o.push({type: 'fountain', x: 1080, y: GROUND_Y - 30, w: 50, h: 30, dmg: 5});
+  o.push({type: 'rock',  x: 1240, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'hedge', x: 1380, y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'bench', x: 1530, y: GROUND_Y - 18, w: 44, h: 18, dmg: 5});
+  o.push({type: 'stream', x: 1700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'hedge',  x: 1820, y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'bench',  x: 1960, y: GROUND_Y - 18, w: 44, h: 18, dmg: 5,
+          mv: {type: 'patrol', baseX: 1960, range: 30, speed: 0.4, dir: 1}});
+  o.push({type: 'rock',   x: 2110, y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'hedge',  x: 2260, y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'fountain',x: 2400, y: GROUND_Y - 30, w: 50, h: 30, dmg: 5});
+  o.push({type: 'bench',  x: 2560, y: GROUND_Y - 18, w: 44, h: 18, dmg: 5});
+  o.push({type: 'stream', x: 2700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'hedge',  x: 2820, y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'rock',   x: 2960, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'bench',  x: 3100, y: GROUND_Y - 18, w: 44, h: 18, dmg: 5,
+          mv: {type: 'patrol', baseX: 3100, range: 30, speed: 0.4, dir: -1}});
+  o.push({type: 'hedge',  x: 3240, y: GROUND_Y - 14, w: 50, h: 14, dmg: 5});
+  o.push({type: 'stream', x: 3300, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',   x: 3460, y: GROUND_Y - 14, w: 20, h: 14, dmg: 15});
+  o.push({type: 'den',    x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  const xs = [160, 280, 440, 580, 720, 880, 1020, 1180, 1320, 1460, 1620, 1780, 1900, 2060, 2200, 2340, 2480, 2620, 2780, 2920, 3060, 3200, 3360, 3500];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  // Lots of food per spec
+  c.push({type: 'bamboo', x: 460,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 760,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1140, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1500, y: GROUND_Y - 36, taken: false});
+  c.push({type: 'bamboo', x: 1880, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 2240, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2620, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 2900, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 3320, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel6() {
+  // SUBURBS — fences, gnomes, dogs (moving), wheelie bins
+  const grounds = [[0, LEVEL_W]];
+  const o = [];
+  o.push({type: 'gnome',      x: 220,  y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'fence',      x: 360,  y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'wheeliebin', x: 500,  y: GROUND_Y - 28, w: 20, h: 28, dmg: 10});
+  o.push({type: 'dog',        x: 660,  y: GROUND_Y - 16, w: 26, h: 16, dmg: 15,
+          mv: {type: 'patrol', baseX: 660, range: 60, speed: 1.0, dir: 1}});
+  o.push({type: 'gnome',      x: 820,  y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'fence',      x: 940,  y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'wheeliebin', x: 1080, y: GROUND_Y - 28, w: 20, h: 28, dmg: 10});
+  o.push({type: 'fence',      x: 1240, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'gnome',      x: 1380, y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'dog',        x: 1500, y: GROUND_Y - 16, w: 26, h: 16, dmg: 15,
+          mv: {type: 'patrol', baseX: 1500, range: 60, speed: 1.1, dir: 1}});
+  o.push({type: 'fence',      x: 1680, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'wheeliebin', x: 1820, y: GROUND_Y - 28, w: 20, h: 28, dmg: 10});
+  o.push({type: 'gnome',      x: 1980, y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'fence',      x: 2120, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'dog',        x: 2280, y: GROUND_Y - 16, w: 26, h: 16, dmg: 15,
+          mv: {type: 'patrol', baseX: 2280, range: 70, speed: 1.1, dir: -1}});
+  o.push({type: 'wheeliebin', x: 2460, y: GROUND_Y - 28, w: 20, h: 28, dmg: 10});
+  o.push({type: 'fence',      x: 2600, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'gnome',      x: 2740, y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'fence',      x: 2880, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'dog',        x: 3040, y: GROUND_Y - 16, w: 26, h: 16, dmg: 15,
+          mv: {type: 'patrol', baseX: 3040, range: 60, speed: 1.2, dir: 1}});
+  o.push({type: 'wheeliebin', x: 3220, y: GROUND_Y - 28, w: 20, h: 28, dmg: 10});
+  o.push({type: 'fence',      x: 3360, y: GROUND_Y - 30, w: 14, h: 30, dmg: 15});
+  o.push({type: 'gnome',      x: 3500, y: GROUND_Y - 14, w: 12, h: 14, dmg: 5});
+  o.push({type: 'den',        x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  const xs = [160, 280, 440, 600, 740, 880, 1020, 1160, 1320, 1460, 1620, 1760, 1920, 2060, 2220, 2380, 2540, 2680, 2820, 2980, 3160, 3300, 3460, 3580];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  c.push({type: 'bamboo', x: 580,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1620, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2400, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 3140, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel7() {
+  // HIGHWAY — concrete barriers, fast cars and trucks. Hardest urban.
+  const grounds = [[0, LEVEL_W]];
+  const o = [];
+  o.push({type: 'barrier', x: 200,  y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 380,  y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 580,  y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 800,  y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 1020, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 1240, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 1460, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 1680, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 1900, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 2120, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 2340, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 2560, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 2780, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 3000, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 3220, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  o.push({type: 'barrier', x: 3440, y: GROUND_Y - 22, w: 36, h: 22, dmg: 5});
+  // Fast cars and trucks
+  const lane = GROUND_Y - 18;
+  o.push({type: 'car',   x: 300,  y: lane, w: 44, h: 18, dmg: 25, mv: {type: 'loop_left', speed: 3.5}});
+  o.push({type: 'truck', x: 700,  y: GROUND_Y - 22, w: 60, h: 22, dmg: 25, mv: {type: 'loop_left', speed: 3.4}});
+  o.push({type: 'car',   x: 1100, y: lane, w: 44, h: 18, dmg: 25, mv: {type: 'loop_left', speed: 3.6}});
+  o.push({type: 'truck', x: 1500, y: GROUND_Y - 22, w: 60, h: 22, dmg: 25, mv: {type: 'loop_left', speed: 3.5}});
+  o.push({type: 'car',   x: 1900, y: lane, w: 44, h: 18, dmg: 25, mv: {type: 'loop_left', speed: 3.7}});
+  o.push({type: 'truck', x: 2300, y: GROUND_Y - 22, w: 60, h: 22, dmg: 25, mv: {type: 'loop_left', speed: 3.4}});
+  o.push({type: 'car',   x: 2700, y: lane, w: 44, h: 18, dmg: 25, mv: {type: 'loop_left', speed: 3.8}});
+  o.push({type: 'truck', x: 3100, y: GROUND_Y - 22, w: 60, h: 22, dmg: 25, mv: {type: 'loop_left', speed: 3.5}});
+  o.push({type: 'den',   x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  // coins in risky spots — over the lanes between barriers
+  const coinSpots = [180, 290, 470, 690, 910, 1130, 1350, 1570, 1790, 2010, 2230, 2450, 2670, 2890, 3110, 3330, 3550];
+  for (let i = 0; i < coinSpots.length; i++) {
+    c.push({type: 'coin', x: coinSpots[i], y: GROUND_Y - 50 - (i % 3) * 12, taken: false});
+  }
+  // some risky high coins
+  c.push({type: 'coin', x: 400,  y: GROUND_Y - 70, taken: false});
+  c.push({type: 'coin', x: 800,  y: GROUND_Y - 70, taken: false});
+  c.push({type: 'coin', x: 1200, y: GROUND_Y - 70, taken: false});
+  c.push({type: 'coin', x: 2000, y: GROUND_Y - 70, taken: false});
+  c.push({type: 'coin', x: 2800, y: GROUND_Y - 70, taken: false});
+  c.push({type: 'fruit', x: 1740, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2960, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel8() {
+  // FOREST EDGE — rolling logs, rocks, tree roots, stumps
+  const grounds = [[0, 1700], [1760, 2700], [2760, 3300], [3360, LEVEL_W]];
+  const o = [];
+  o.push({type: 'rock',         x: 220,  y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'treeroot',     x: 360,  y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stump',        x: 520,  y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rolling_log',  x: 680,  y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 680, range: 50, speed: 1.5, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'rock',         x: 850,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'treeroot',     x: 980,  y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stump',        x: 1140, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rolling_log',  x: 1300, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 1300, range: 60, speed: 1.6, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'rock',         x: 1480, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'treeroot',     x: 1620, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stream',       x: 1700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'stump',        x: 1820, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rock',         x: 1980, y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'rolling_log',  x: 2120, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 2120, range: 60, speed: 1.7, dir: -1, rotates: true, rot: 0}});
+  o.push({type: 'treeroot',     x: 2300, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stump',        x: 2460, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rock',         x: 2620, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'stream',       x: 2700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rolling_log',  x: 2820, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 2820, range: 60, speed: 1.6, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'treeroot',     x: 3000, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stump',        x: 3140, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rock',         x: 3260, y: GROUND_Y - 14, w: 20, h: 14, dmg: 15});
+  o.push({type: 'stream',       x: 3300, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'treeroot',     x: 3440, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'den',          x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  // Bamboo more frequent per spec
+  const xs = [180, 320, 460, 620, 780, 920, 1060, 1220, 1360, 1500, 1640, 1820, 1940, 2080, 2220, 2380, 2520, 2680, 2880, 3060, 3200, 3380, 3540];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  c.push({type: 'bamboo', x: 280,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 600,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1080, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1450, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1860, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2380, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2900, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1140, y: GROUND_Y - 38, taken: false});
+  c.push({type: 'fruit',  x: 2460, y: GROUND_Y - 38, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel9() {
+  // MOUNTAIN PATH — rolling boulders, outcrops to climb, ice patches
+  const grounds = [[0, LEVEL_W]];
+  const o = [];
+  o.push({type: 'rock',    x: 220,  y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'ice',     x: 320,  y: GROUND_Y - 2,  w: 80, h: 4});
+  o.push({type: 'outcrop', x: 460,  y: GROUND_Y - 30, w: 36, h: 30, dmg: 5});
+  o.push({type: 'rock',    x: 620,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'boulder', x: 780,  y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.0, rotates: true, rot: 0}});
+  o.push({type: 'ice',     x: 900,  y: GROUND_Y - 2,  w: 100, h: 4});
+  o.push({type: 'outcrop', x: 1080, y: GROUND_Y - 36, w: 40, h: 36, dmg: 5});
+  o.push({type: 'rock',    x: 1240, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'boulder', x: 1380, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.1, rotates: true, rot: 0}});
+  o.push({type: 'ice',     x: 1500, y: GROUND_Y - 2,  w: 100, h: 4});
+  o.push({type: 'outcrop', x: 1660, y: GROUND_Y - 30, w: 36, h: 30, dmg: 5});
+  o.push({type: 'rock',    x: 1820, y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'boulder', x: 1980, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.2, rotates: true, rot: 0}});
+  o.push({type: 'outcrop', x: 2120, y: GROUND_Y - 36, w: 40, h: 36, dmg: 5});
+  o.push({type: 'ice',     x: 2240, y: GROUND_Y - 2,  w: 80, h: 4});
+  o.push({type: 'rock',    x: 2380, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'boulder', x: 2520, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.2, rotates: true, rot: 0}});
+  o.push({type: 'outcrop', x: 2680, y: GROUND_Y - 30, w: 36, h: 30, dmg: 5});
+  o.push({type: 'ice',     x: 2820, y: GROUND_Y - 2,  w: 100, h: 4});
+  o.push({type: 'rock',    x: 2980, y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'boulder', x: 3120, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.3, rotates: true, rot: 0}});
+  o.push({type: 'outcrop', x: 3260, y: GROUND_Y - 36, w: 40, h: 36, dmg: 5});
+  o.push({type: 'ice',     x: 3400, y: GROUND_Y - 2,  w: 80, h: 4});
+  o.push({type: 'rock',    x: 3540, y: GROUND_Y - 12, w: 16, h: 12, dmg: 15});
+  o.push({type: 'den',     x: 3680, y: GROUND_Y - 50, w: 60, h: 50});
+
+  const c = [];
+  // Higher platforms - coins on top of outcrops
+  const xs = [180, 280, 460, 600, 760, 880, 1080, 1240, 1380, 1520, 1660, 1820, 1960, 2120, 2280, 2420, 2560, 2700, 2840, 2980, 3140, 3280, 3440, 3580];
+  for (let i = 0; i < xs.length; i++) {
+    c.push({type: 'coin', x: xs[i], y: GROUND_Y - 30 - (i % 3) * 18, taken: false});
+  }
+  c.push({type: 'coin',   x: 478,  y: GROUND_Y - 60, taken: false}); // on outcrop
+  c.push({type: 'coin',   x: 1100, y: GROUND_Y - 66, taken: false}); // on outcrop
+  c.push({type: 'coin',   x: 1678, y: GROUND_Y - 60, taken: false});
+  c.push({type: 'coin',   x: 2140, y: GROUND_Y - 66, taken: false});
+  c.push({type: 'fruit',  x: 1300, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 2300, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 3340, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+function buildLevel10() {
+  // DEEP FOREST → HOME DEN — mix of all natural obstacles, lots of collectibles
+  const grounds = [[0, 1700], [1760, 2700], [2760, 3300], [3360, LEVEL_W]];
+  const o = [];
+  o.push({type: 'rock',         x: 200,  y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'stump',        x: 340,  y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'log',          x: 480,  y: GROUND_Y - 16, w: 36, h: 16, dmg: 15});
+  o.push({type: 'rolling_log',  x: 620,  y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 620, range: 60, speed: 1.6, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'treeroot',     x: 800,  y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'rock',         x: 940,  y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'stump',        x: 1080, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'boulder',      x: 1240, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.0, rotates: true, rot: 0}});
+  o.push({type: 'log',          x: 1380, y: GROUND_Y - 16, w: 40, h: 16, dmg: 15});
+  o.push({type: 'rolling_log',  x: 1520, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 1520, range: 50, speed: 1.7, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'treeroot',     x: 1640, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stream',       x: 1700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rock',         x: 1820, y: GROUND_Y - 14, w: 22, h: 14, dmg: 15});
+  o.push({type: 'stump',        x: 1960, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'boulder',      x: 2100, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.1, rotates: true, rot: 0}});
+  o.push({type: 'rolling_log',  x: 2280, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 2280, range: 60, speed: 1.8, dir: -1, rotates: true, rot: 0}});
+  o.push({type: 'log',          x: 2440, y: GROUND_Y - 16, w: 36, h: 16, dmg: 15});
+  o.push({type: 'treeroot',     x: 2580, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stream',       x: 2700, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'stump',        x: 2820, y: GROUND_Y - 24, w: 32, h: 24, dmg: 5});
+  o.push({type: 'rock',         x: 2960, y: GROUND_Y - 12, w: 18, h: 12, dmg: 15});
+  o.push({type: 'boulder',      x: 3120, y: GROUND_Y - 22, w: 22, h: 22, dmg: 25,
+          mv: {type: 'loop_left', speed: 2.2, rotates: true, rot: 0}});
+  o.push({type: 'treeroot',     x: 3240, y: 176,           w: 44, h: 8,  dmg: 15});
+  o.push({type: 'stream',       x: 3300, y: GROUND_Y,      w: 60, h: 20});
+  o.push({type: 'rolling_log',  x: 3450, y: GROUND_Y - 14, w: 28, h: 14, dmg: 15,
+          mv: {type: 'patrol', baseX: 3450, range: 40, speed: 1.5, dir: 1, rotates: true, rot: 0}});
+  o.push({type: 'den',          x: 3680, y: GROUND_Y - 60, w: 80, h: 60, big: true}); // larger den
+
+  const c = [];
+  // Lots of collectibles
+  const coinXs = [160, 240, 320, 420, 520, 600, 700, 780, 880, 980, 1060, 1160, 1240, 1340, 1440, 1560, 1660, 1820, 1900, 1980, 2080, 2180, 2280, 2400, 2500, 2620, 2700, 2820, 2940, 3040, 3160, 3260, 3340, 3500, 3580];
+  for (let i = 0; i < coinXs.length; i++) {
+    c.push({type: 'coin', x: coinXs[i], y: GROUND_Y - 30 - (i % 4) * 16, taken: false});
+  }
+  c.push({type: 'bamboo', x: 280,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 560,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 900,  y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1340, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'bamboo', x: 1620, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 1960, y: GROUND_Y - 38, taken: false});
+  c.push({type: 'bamboo', x: 2360, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 2820, y: GROUND_Y - 38, taken: false});
+  c.push({type: 'bamboo', x: 3200, y: GROUND_Y - 14, taken: false});
+  c.push({type: 'fruit',  x: 3520, y: GROUND_Y - 14, taken: false});
+  return { obstacles: o, collectibles: c, groundSegs: grounds };
+}
+
+const LEVEL_BUILDERS = {
+  1: () => ({
+    obstacles: deepCopy(LEVEL1_INIT.obstacles),
+    collectibles: deepCopy(LEVEL1_INIT.collectibles),
+    groundSegs: deepCopy(LEVEL1_INIT.groundSegs)
+  }),
+  2: buildLevel2,
+  3: buildLevel3,
+  4: buildLevel4,
+  5: buildLevel5,
+  6: buildLevel6,
+  7: buildLevel7,
+  8: buildLevel8,
+  9: buildLevel9,
+  10: buildLevel10
+};
+
+function loadLevel(n) {
+  currentLevel = n;
+  const data = LEVEL_BUILDERS[n]();
+  obstacles = data.obstacles;
+  collectibles = data.collectibles;
+  groundSegs = data.groundSegs;
+  obstaclesPassed = new Set();
+  resetPlayer();
+  camera.x = 0;
+  startMusic(LEVEL_META[n].track);
+}
+
+// Type sets for collision dispatch
+const SOLID_TYPES = new Set(['box', 'stump', 'dumpster', 'bench', 'barrier', 'outcrop', 'parked_car', 'fountain']);
+const HAZARD_GROUND = new Set(['rock', 'log', 'fence', 'hydrant', 'newsstand', 'gnome', 'hedge', 'wheeliebin', 'trashcan', 'dog', 'car', 'truck', 'rolling_log', 'boulder']);
+const HAZARD_DUCKABLE = new Set(['branch', 'treeroot']);
+const PIT_TYPES = new Set(['stream', 'puddle']);
+
+// ============================================================
+// HELPERS
+// ============================================================
+function aabb(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function groundXAt(x) {
+  for (let i = 0; i < groundSegs.length; i++) {
+    const s = groundSegs[i][0], e = groundSegs[i][1];
+    if (x >= s && x < e) return true;
+  }
+  return false;
+}
+
+function damage(amount) {
+  if (player.invincible > 0) return;
+  player.health -= amount;
+  player.invincible = IFRAMES;
+  playSfx('hit');
+  if (player.health <= 0) {
+    player.health = 0;
+    gameState = STATE.GAMEOVER;
+    stateTimer = 0;
+    stopMusic();
+    playSfx('game_over');
+  }
+}
+
+function getPlayerHitbox() {
+  const hitH = player.ducking ? 14 : 24;
+  const yOff = player.ducking ? 10 : 0;
+  return { x: player.x, y: player.y + yOff, w: player.w, h: hitH };
+}
+
+// ============================================================
+// SPRITES
+// ============================================================
+function px(x, y, w, h) {
+  ctx.fillRect(Math.floor(x), Math.floor(y), w, h);
+}
+
+function drawReddy(x, y, state, frame, facing, ducking) {
+  ctx.save();
+  if (ducking) {
+    ctx.translate(Math.floor(x), Math.floor(y) + 10);
+  } else {
+    ctx.translate(Math.floor(x), Math.floor(y));
+  }
+  if (facing < 0) {
+    ctx.scale(-1, 1);
+    ctx.translate(-12, 0);
+  }
+
+  if (ducking) {
+    // 12 wide, 14 tall ducking sprite (legs tucked, body forward)
+    // Tail (trailing)
+    ctx.fillStyle = COL.RUST;  px(-3, 4, 3, 2);
+    ctx.fillStyle = COL.CREAM; px(-3, 6, 3, 2);
+    ctx.fillStyle = COL.RUST;  px(-3, 8, 3, 2);
+    // Body
+    ctx.fillStyle = COL.RUST;  px(0, 5, 12, 7);
+    ctx.fillStyle = COL.CREAM; px(2, 7, 8, 4);
+    // Head (low forward)
+    ctx.fillStyle = COL.RUST;  px(2, 0, 10, 7);
+    // Ears
+    ctx.fillStyle = COL.ORANGE; px(2, -1, 2, 2); px(10, -1, 2, 2);
+    // Face mask
+    ctx.fillStyle = COL.CREAM; px(3, 2, 2, 3); px(9, 2, 2, 3);
+    // Eyes
+    ctx.fillStyle = COL.WHITE; px(4, 3, 1, 1); px(10, 3, 1, 1);
+    ctx.fillStyle = COL.BLACK; px(4, 4, 1, 1); px(10, 4, 1, 1);
+    // Nose
+    ctx.fillStyle = COL.BLACK; px(7, 5, 2, 1);
+    // Legs tucked
+    ctx.fillStyle = COL.DARK;  px(2, 12, 3, 2); px(7, 12, 3, 2);
+  } else {
+    // 12 wide, 24 tall standing sprite
+    const isWalk = state === 'walk';
+    const isJump = state === 'jump';
+    const isClimb = state === 'climb';
+
+    // --- TAIL (ringed, behind body) ---
+    const tailWag = (state === 'idle') ? Math.sin(frameCount * 0.08) * 1 : 0;
+    ctx.fillStyle = COL.RUST;
+    px(-2, 11 + tailWag, 3, 2);
+    ctx.fillStyle = COL.CREAM;
+    px(-3, 13 + tailWag, 3, 2);
+    ctx.fillStyle = COL.RUST;
+    px(-3, 15 + tailWag, 3, 2);
+    ctx.fillStyle = COL.CREAM;
+    px(-2, 17 + tailWag, 3, 2);
+    ctx.fillStyle = COL.RUST;
+    px(-1, 18 + tailWag, 2, 1);
+
+    // --- BODY ---
+    ctx.fillStyle = COL.RUST;
+    px(1, 10, 10, 9);
+    // shading on top
+    ctx.fillStyle = COL.RUST_LT;
+    px(2, 10, 8, 1);
+    // belly
+    ctx.fillStyle = COL.CREAM;
+    px(3, 12, 6, 6);
+
+    // --- HEAD ---
+    ctx.fillStyle = COL.RUST;
+    px(1, 1, 10, 9);
+    // top shading
+    ctx.fillStyle = COL.RUST_LT;
+    px(2, 1, 8, 1);
+
+    // ears (orange/dark inner)
+    ctx.fillStyle = COL.ORANGE;
+    px(0, 0, 3, 2);
+    px(9, 0, 3, 2);
+    ctx.fillStyle = COL.RUST;
+    px(1, 1, 1, 1);
+    px(10, 1, 1, 1);
+
+    // face mask (cream around eyes)
+    ctx.fillStyle = COL.CREAM;
+    px(2, 4, 2, 3);
+    px(8, 4, 2, 3);
+    px(4, 6, 4, 2);
+
+    // eyes whites
+    ctx.fillStyle = COL.WHITE;
+    px(2, 5, 2, 1);
+    px(8, 5, 2, 1);
+    // pupils (centered, look forward)
+    ctx.fillStyle = COL.BLACK;
+    px(3, 5, 1, 1);
+    px(8, 5, 1, 1);
+
+    // nose
+    ctx.fillStyle = COL.BLACK;
+    px(5, 8, 2, 1);
+    // mouth
+    px(5, 9, 1, 1);
+
+    // --- ARMS ---
+    ctx.fillStyle = COL.RUST;
+    if (isJump) {
+      px(0, 11, 2, 4);
+      px(10, 11, 2, 4);
+    } else if (isClimb) {
+      const cy = (frame % 2) ? 0 : 2;
+      px(0, 9 + cy, 2, 4);
+      px(10, 9 - cy, 2, 4);
+    } else if (isWalk) {
+      const swing = (frame % 2) ? 1 : -1;
+      px(0, 11 + swing, 2, 4);
+      px(10, 11 - swing, 2, 4);
+    } else {
+      px(0, 12, 2, 4);
+      px(10, 12, 2, 4);
+    }
+
+    // --- LEGS ---
+    ctx.fillStyle = COL.DARK;
+    if (isJump) {
+      px(2, 19, 3, 3);
+      px(7, 19, 3, 3);
+      ctx.fillStyle = COL.BLACK;
+      px(2, 22, 3, 1);
+      px(7, 22, 3, 1);
+    } else if (isWalk) {
+      if (frame % 2 === 0) {
+        px(2, 19, 3, 5);
+        px(7, 19, 3, 4);
+        ctx.fillStyle = COL.BLACK;
+        px(1, 23, 4, 1);
+        px(7, 22, 3, 1);
+      } else {
+        px(2, 19, 3, 4);
+        px(7, 19, 3, 5);
+        ctx.fillStyle = COL.BLACK;
+        px(2, 22, 3, 1);
+        px(7, 23, 4, 1);
+      }
+    } else if (isClimb) {
+      const cy = (frame % 2) ? 1 : -1;
+      px(2, 19 + cy, 3, 4);
+      px(7, 19 - cy, 3, 4);
+      ctx.fillStyle = COL.BLACK;
+      px(2, 22 + cy, 3, 1);
+      px(7, 22 - cy, 3, 1);
+    } else {
+      px(2, 19, 3, 5);
+      px(7, 19, 3, 5);
+      ctx.fillStyle = COL.BLACK;
+      px(2, 23, 3, 1);
+      px(7, 23, 3, 1);
+    }
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
+// BACKGROUND DRAWING
+// ============================================================
+function drawSkyGradient() {
+  // simple two-tone sky
+  ctx.fillStyle = COL.SKY_TOP;
+  ctx.fillRect(0, 0, VW, 90);
+  ctx.fillStyle = COL.SKY_BOT;
+  ctx.fillRect(0, 90, VW, 110);
+}
+
+function drawCloud(x, y, scale) {
+  scale = scale || 1;
+  ctx.fillStyle = COL.CLOUD;
+  px(x + 4, y, 12 * scale, 4);
+  px(x, y + 4, 24 * scale, 4);
+  px(x + 4, y + 8, 16 * scale, 3);
+}
+
+function drawHill(x, y, w, color) {
+  ctx.fillStyle = color;
+  // rounded hill — stack of decreasing rects
+  const step = 4;
+  for (let i = 0; i < w / 2; i += step) {
+    const inset = Math.floor(Math.sqrt(i / (w / 2)) * 14);
+    px(x + i, y + inset, step, VH - y - inset);
+    px(x + w - i - step, y + inset, step, VH - y - inset);
+  }
+  px(x + w / 2 - 2, y, 4, VH - y);
+}
+
+function drawFarBg() {
+  // Clouds (parallax 0.15)
+  const cloudOff = (camera.x * 0.15);
+  for (let i = -1; i < 8; i++) {
+    const baseX = i * 180 - (cloudOff % 180);
+    drawCloud(baseX + 20, 25, 1);
+    drawCloud(baseX + 100, 50, 1);
+    drawCloud(baseX + 60, 70, 1);
+  }
+  // Distant hills (parallax 0.3)
+  const hillOff = (camera.x * 0.3);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 200 - (hillOff % 200);
+    drawHill(x, 130, 200, COL.HILL_FAR);
+  }
+}
+
+function drawTreeBg(x, y) {
+  // Trunk
+  ctx.fillStyle = COL.LOG_DK;
+  px(x + 10, y + 18, 4, 14);
+  // Foliage clusters
+  ctx.fillStyle = COL.HILL_FAR;
+  px(x + 4, y + 8, 16, 14);
+  px(x, y + 12, 24, 8);
+  px(x + 6, y + 4, 12, 8);
+  ctx.fillStyle = COL.HILL_NEAR;
+  px(x + 6, y + 10, 4, 4);
+  px(x + 14, y + 6, 4, 4);
+}
+
+function drawMidBg() {
+  // Trees behind fence (parallax 0.5)
+  const treeOff = (camera.x * 0.5);
+  for (let i = -1; i < 10; i++) {
+    const x = i * 100 - (treeOff % 100);
+    drawTreeBg(x + 10, 130);
+  }
+  // Zoo fence — wooden vertical bars across the lower mid bg
+  const fenceOff = (camera.x * 0.5);
+  ctx.fillStyle = COL.FENCE;
+  for (let i = -1; i < 32; i++) {
+    const x = i * 16 - (fenceOff % 16);
+    px(x, 168, 3, 36);
+  }
+  // pickets pointed tops
+  ctx.fillStyle = COL.FENCE_DK;
+  for (let i = -1; i < 32; i++) {
+    const x = i * 16 - (fenceOff % 16);
+    px(x, 166, 3, 2);
+  }
+  // horizontal rails
+  ctx.fillStyle = COL.FENCE_DK;
+  px(0, 175, VW, 2);
+  px(0, 195, VW, 2);
+}
+
+// ============================================================
+// FOREGROUND DRAWING
+// ============================================================
+function drawGround() {
+  for (let i = 0; i < groundSegs.length; i++) {
+    const s = groundSegs[i][0], e = groundSegs[i][1];
+    // grass top
+    ctx.fillStyle = COL.GRASS;
+    px(s, GROUND_Y, e - s, 4);
+    ctx.fillStyle = COL.GRASS_DK;
+    px(s, GROUND_Y + 4, e - s, 2);
+    // grass blades
+    ctx.fillStyle = COL.GRASS_BLADE;
+    for (let x = s; x < e; x += 12) {
+      px(x + ((x * 7) % 8), GROUND_Y - 1, 1, 2);
+    }
+    // dirt
+    ctx.fillStyle = COL.DIRT;
+    px(s, GROUND_Y + 6, e - s, VH - GROUND_Y - 6);
+    // dirt details
+    ctx.fillStyle = COL.DIRT_DK;
+    for (let x = s; x < e; x += 24) {
+      px(x + 4, GROUND_Y + 12, 6, 2);
+      px(x + 14, GROUND_Y + 22, 4, 2);
+    }
+    ctx.fillStyle = COL.DIRT_LT;
+    for (let x = s; x < e; x += 32) {
+      px(x + 18, GROUND_Y + 16, 4, 1);
+    }
+  }
+}
+
+function drawRock(o) {
+  ctx.fillStyle = COL.ROCK_DK;
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  ctx.fillStyle = COL.ROCK;
+  px(o.x + 1, o.y + 2, o.w - 2, o.h - 2);
+  px(o.x, o.y + 4, o.w, o.h - 6);
+  ctx.fillStyle = COL.ROCK_LT;
+  px(o.x + 2, o.y, o.w - 4, 3);
+  px(o.x + 4, o.y + 3, 4, 1);
+  ctx.fillStyle = COL.ROCK_DK;
+  px(o.x + o.w - 4, o.y + 4, 2, 2);
+  px(o.x + 2, o.y + o.h - 4, 2, 1);
+}
+
+function drawLog(o) {
+  // log body
+  ctx.fillStyle = COL.LOG;
+  px(o.x, o.y + 2, o.w, o.h - 4);
+  ctx.fillStyle = COL.LOG_LT;
+  px(o.x, o.y + 2, o.w, 2);
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x, o.y + o.h - 4, o.w, 2);
+  // bark texture lines
+  ctx.fillStyle = COL.LOG_DK;
+  for (let i = 4; i < o.w - 4; i += 6) {
+    px(o.x + i, o.y + 5, 2, 4);
+  }
+  // end caps (rings)
+  ctx.fillStyle = COL.LOG_LT;
+  px(o.x - 2, o.y + 4, 4, o.h - 8);
+  px(o.x + o.w - 2, o.y + 4, 4, o.h - 8);
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x - 1, o.y + (o.h / 2) - 1, 2, 2);
+  px(o.x + o.w - 1, o.y + (o.h / 2) - 1, 2, 2);
+}
+
+function drawBox(o) {
+  // wooden crate
+  ctx.fillStyle = COL.BOX;
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = COL.BOX_LT;
+  px(o.x, o.y, o.w, 2);
+  px(o.x, o.y, 2, o.h);
+  ctx.fillStyle = COL.BOX_DK;
+  px(o.x + o.w - 2, o.y, 2, o.h);
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  // diagonal planks
+  ctx.fillStyle = COL.BOX_DK;
+  for (let i = 0; i < o.w; i += 2) {
+    px(o.x + i, o.y + i, 1, 1);
+    px(o.x + (o.w - i - 1), o.y + i, 1, 1);
+  }
+  // ladder on left side
+  ctx.fillStyle = COL.LADDER;
+  px(o.x - 4, o.y, 2, o.h);
+  px(o.x + 2, o.y, 2, o.h);
+  for (let r = 4; r < o.h - 2; r += 6) {
+    px(o.x - 4, o.y + r, 8, 2);
+  }
+}
+
+function drawStump(o) {
+  // trunk
+  ctx.fillStyle = COL.STUMP;
+  px(o.x, o.y + 4, o.w, o.h - 4);
+  ctx.fillStyle = COL.DIRT_DK;
+  for (let i = 4; i < o.w; i += 6) {
+    px(o.x + i, o.y + 8, 2, o.h - 12);
+  }
+  // top (ring pattern)
+  ctx.fillStyle = COL.STUMP_TOP;
+  px(o.x, o.y, o.w, 6);
+  ctx.fillStyle = COL.STUMP_RING;
+  px(o.x + 4, o.y + 2, o.w - 8, 1);
+  px(o.x + 8, o.y + 4, o.w - 16, 1);
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x, o.y + 5, o.w, 1);
+}
+
+function drawStream(o) {
+  // dirt walls inside the gap
+  ctx.fillStyle = COL.DIRT_DK;
+  px(o.x - 2, o.y, 2, 8);
+  px(o.x + o.w, o.y, 2, 8);
+  // water
+  ctx.fillStyle = COL.WATER_DK;
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = COL.WATER;
+  px(o.x, o.y + 2, o.w, o.h - 4);
+  // surface ripples
+  ctx.fillStyle = COL.WATER_LT;
+  for (let i = 0; i < o.w; i += 6) {
+    const wave = Math.floor(Math.sin((frameCount * 0.1 + i * 0.5)) * 1);
+    px(o.x + i, o.y + 2 + wave, 3, 1);
+  }
+  // sparkles
+  ctx.fillStyle = COL.WHITE;
+  for (let i = 4; i < o.w; i += 12) {
+    if ((frameCount + i) % 60 < 20) {
+      px(o.x + i + 2, o.y + 4, 1, 1);
+    }
+  }
+
+  // Splash effect when Reddy is swimming in this stream
+  if (player.swimming) {
+    const pc = player.x + player.w / 2;
+    if (pc >= o.x && pc < o.x + o.w) {
+      const sx = Math.floor(pc);
+      // splash drops
+      ctx.fillStyle = COL.WATER_LT;
+      const splashPhase = frameCount % 16;
+      if (splashPhase < 8) {
+        px(sx - 3, o.y - 1 + (splashPhase < 4 ? -splashPhase : splashPhase - 8), 1, 1);
+        px(sx + 3, o.y - 1 + (splashPhase < 4 ? -splashPhase : splashPhase - 8), 1, 1);
+        px(sx,     o.y - 2 + (splashPhase < 4 ? -splashPhase * 0.5 : 0), 1, 1);
+      }
+      ctx.fillStyle = COL.WHITE;
+      px(sx - 2, o.y, 1, 1);
+      px(sx + 2, o.y, 1, 1);
+    }
+  }
+}
+
+function drawBranch(o) {
+  // hanging branch with leaves
+  ctx.fillStyle = COL.BRANCH;
+  px(o.x, o.y + 2, o.w, 4);
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x, o.y + 2, o.w, 1);
+  px(o.x, o.y + 5, o.w, 1);
+  // leaves
+  ctx.fillStyle = COL.BRANCH_LEAF;
+  for (let i = 0; i < o.w; i += 8) {
+    px(o.x + i, o.y - 2, 6, 4);
+    px(o.x + i + 2, o.y + 6, 4, 4);
+  }
+  ctx.fillStyle = COL.HILL_NEAR;
+  for (let i = 4; i < o.w; i += 12) {
+    px(o.x + i, o.y - 4, 4, 4);
+  }
+  // tree connection on left
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x - 6, o.y - 8, 6, 16);
+}
+
+function drawDen(o) {
+  // grassy mound
+  ctx.fillStyle = COL.HILL_DEN;
+  for (let i = 0; i < o.w; i += 2) {
+    const cx = i - o.w / 2;
+    const inset = Math.floor((cx * cx) / (o.w * 0.5));
+    px(o.x + i, o.y + inset, 2, o.h - inset + 16);
+  }
+  ctx.fillStyle = COL.GRASS_DK;
+  for (let i = 0; i < o.w; i += 4) {
+    const cx = i - o.w / 2;
+    const inset = Math.floor((cx * cx) / (o.w * 0.5));
+    px(o.x + i, o.y + inset, 1, 2);
+  }
+  // den opening (cave mouth)
+  const dx = o.x + o.w / 2 - 10;
+  const dy = o.y + o.h - 24;
+  ctx.fillStyle = COL.DEN_RIM;
+  px(dx - 2, dy, 24, 24);
+  ctx.fillStyle = COL.DEN;
+  px(dx, dy + 2, 20, 22);
+  // arch top
+  ctx.fillStyle = COL.HILL_DEN;
+  px(dx, dy, 2, 4);
+  px(dx + 18, dy, 2, 4);
+  // sign / paw print
+  ctx.fillStyle = COL.CREAM;
+  px(o.x + o.w / 2 - 1, dy - 8, 2, 2);
+  px(o.x + o.w / 2 - 4, dy - 6, 2, 2);
+  px(o.x + o.w / 2 + 2, dy - 6, 2, 2);
+}
+
+function drawCoin(c) {
+  const t = frameCount * 0.15;
+  const wobble = Math.abs(Math.sin(t));
+  const w = Math.max(2, Math.floor(8 * wobble));
+  const offset = Math.floor((8 - w) / 2);
+  ctx.fillStyle = COL.GOLD_DK;
+  px(c.x - w / 2, c.y - 4, w, 8);
+  ctx.fillStyle = COL.GOLD;
+  px(c.x - w / 2 + 1, c.y - 3, Math.max(1, w - 2), 6);
+  ctx.fillStyle = COL.GOLD_LT;
+  if (w > 3) px(c.x - w / 2 + 1, c.y - 3, 1, 6);
+}
+
+function drawBamboo(c) {
+  // vertical green stalk with segments
+  ctx.fillStyle = COL.BAMBOO_DK;
+  px(c.x - 2, c.y - 8, 4, 14);
+  ctx.fillStyle = COL.BAMBOO;
+  px(c.x - 1, c.y - 8, 2, 14);
+  // node rings
+  ctx.fillStyle = COL.BAMBOO_DK;
+  px(c.x - 2, c.y - 5, 4, 1);
+  px(c.x - 2, c.y, 4, 1);
+  px(c.x - 2, c.y + 5, 4, 1);
+  // leaves
+  ctx.fillStyle = COL.LEAF;
+  px(c.x + 2, c.y - 9, 4, 2);
+  px(c.x - 6, c.y - 7, 4, 2);
+  px(c.x + 1, c.y - 11, 3, 3);
+}
+
+function drawFruit(c) {
+  // red apple-like fruit
+  ctx.fillStyle = COL.FRUIT_DK;
+  px(c.x - 4, c.y - 3, 8, 8);
+  ctx.fillStyle = COL.FRUIT;
+  px(c.x - 3, c.y - 3, 6, 7);
+  ctx.fillStyle = '#ff8a7a';
+  px(c.x - 2, c.y - 2, 2, 2);
+  // stem
+  ctx.fillStyle = COL.LOG_DK;
+  px(c.x, c.y - 5, 1, 2);
+  // leaf
+  ctx.fillStyle = COL.LEAF;
+  px(c.x + 1, c.y - 6, 3, 2);
+}
+
+function drawCollectible(c) {
+  if (c.type === 'coin') drawCoin(c);
+  else if (c.type === 'bamboo') drawBamboo(c);
+  else if (c.type === 'fruit') drawFruit(c);
+}
+
+// ============================================================
+// PHASE 2/3 OBSTACLE DRAWING
+// ============================================================
+function drawFence(o) {
+  // Tall iron picket fence segment
+  ctx.fillStyle = COL.FENCE_DK;
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = '#c0a070';
+  px(o.x + 2, o.y + 2, o.w - 4, 2);
+  // pickets pattern
+  ctx.fillStyle = COL.FENCE_DK;
+  for (let i = 1; i < o.w - 1; i += 4) {
+    px(o.x + i, o.y + 4, 1, o.h - 6);
+  }
+  ctx.fillStyle = '#3a2a1a';
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  // pointed top
+  ctx.fillStyle = '#c0a070';
+  px(o.x + 1, o.y - 1, o.w - 2, 1);
+}
+
+function drawDumpster(o) {
+  // metal dumpster, dark teal/green
+  ctx.fillStyle = '#3a5a4a';
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = '#5a7a6a';
+  px(o.x, o.y, o.w, 2);
+  px(o.x, o.y, 2, o.h);
+  ctx.fillStyle = '#1a2a1f';
+  px(o.x + o.w - 2, o.y, 2, o.h);
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  // lid
+  ctx.fillStyle = '#2a3a2f';
+  px(o.x, o.y - 3, o.w, 4);
+  ctx.fillStyle = '#5a7a6a';
+  px(o.x, o.y - 3, o.w, 1);
+  // grime stripes
+  ctx.fillStyle = '#1a2a1f';
+  px(o.x + 4, o.y + 6, 2, o.h - 10);
+  px(o.x + o.w - 8, o.y + 8, 2, o.h - 12);
+}
+
+function drawTrashcan(o) {
+  // round metal trash can
+  ctx.fillStyle = '#5a5a5a';
+  px(o.x, o.y + 3, o.w, o.h - 3);
+  ctx.fillStyle = '#7a7a7a';
+  px(o.x, o.y + 3, 2, o.h - 5);
+  ctx.fillStyle = '#3a3a3a';
+  px(o.x + o.w - 2, o.y + 3, 2, o.h - 3);
+  // ring bands
+  ctx.fillStyle = '#3a3a3a';
+  px(o.x, o.y + 8, o.w, 1);
+  px(o.x, o.y + o.h - 6, o.w, 1);
+  // lid
+  ctx.fillStyle = '#3a3a3a';
+  px(o.x - 1, o.y, o.w + 2, 4);
+  ctx.fillStyle = '#5a5a5a';
+  px(o.x, o.y + 1, o.w, 1);
+}
+
+function drawPuddle(o) {
+  if (o.h <= 6) {
+    // shallow puddle
+    ctx.fillStyle = '#222';
+    px(o.x, o.y, o.w, 2);
+    ctx.fillStyle = COL.WATER;
+    px(o.x + 1, o.y + 1, o.w - 2, o.h - 2);
+    ctx.fillStyle = COL.WATER_LT;
+    px(o.x + 4, o.y + 1, 6, 1);
+    px(o.x + o.w - 10, o.y + 2, 6, 1);
+  } else {
+    // pit puddle (like stream)
+    ctx.fillStyle = COL.DIRT_DK;
+    px(o.x - 2, o.y, 2, 8);
+    px(o.x + o.w, o.y, 2, 8);
+    ctx.fillStyle = '#1a2a3a';
+    px(o.x, o.y, o.w, o.h);
+    ctx.fillStyle = '#2a4a5a';
+    px(o.x, o.y + 2, o.w, o.h - 4);
+    ctx.fillStyle = '#3a5a6a';
+    for (let i = 0; i < o.w; i += 6) {
+      const wave = Math.floor(Math.sin((frameCount * 0.1 + i * 0.5)) * 1);
+      px(o.x + i, o.y + 2 + wave, 3, 1);
+    }
+  }
+}
+
+function drawHydrant(o) {
+  // red fire hydrant
+  ctx.fillStyle = '#a82a1a';
+  px(o.x, o.y + 4, o.w, o.h - 4);
+  ctx.fillStyle = '#c84a3a';
+  px(o.x, o.y + 4, 2, o.h - 4);
+  ctx.fillStyle = '#681010';
+  px(o.x + o.w - 2, o.y + 4, 2, o.h - 4);
+  // top cap
+  ctx.fillStyle = '#a82a1a';
+  px(o.x - 1, o.y, o.w + 2, 4);
+  ctx.fillStyle = '#fbd02c';
+  px(o.x + o.w / 2 - 1, o.y + 1, 2, 2);
+  // side nozzles
+  ctx.fillStyle = '#fbd02c';
+  px(o.x - 1, o.y + 8, 1, 3);
+  px(o.x + o.w, o.y + 8, 1, 3);
+}
+
+function drawNewsstand(o) {
+  // small wooden news stand
+  ctx.fillStyle = '#4a3a8a';
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = '#6a5aaa';
+  px(o.x, o.y, o.w, 2);
+  ctx.fillStyle = '#2a1a5a';
+  px(o.x + o.w - 2, o.y, 2, o.h);
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  // newspaper window
+  ctx.fillStyle = COL.WHITE;
+  px(o.x + 4, o.y + 6, o.w - 8, 12);
+  ctx.fillStyle = '#000';
+  for (let i = 0; i < 3; i++) {
+    px(o.x + 5, o.y + 8 + i * 3, o.w - 10, 1);
+  }
+  // roof
+  ctx.fillStyle = '#2a1a5a';
+  px(o.x - 2, o.y - 2, o.w + 4, 3);
+}
+
+function drawParkedCar(o) {
+  // body
+  ctx.fillStyle = '#5a8aca';
+  px(o.x, o.y + 4, o.w, o.h - 8);
+  ctx.fillStyle = '#7aaaee';
+  px(o.x, o.y + 4, o.w, 2);
+  // roof
+  ctx.fillStyle = '#3a6a9a';
+  px(o.x + 8, o.y, o.w - 16, 6);
+  // windows
+  ctx.fillStyle = '#aae0ff';
+  px(o.x + 10, o.y + 1, 8, 4);
+  px(o.x + o.w - 18, o.y + 1, 8, 4);
+  // wheels
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 4, o.y + o.h - 5, 8, 5);
+  px(o.x + o.w - 12, o.y + o.h - 5, 8, 5);
+  ctx.fillStyle = '#444';
+  px(o.x + 6, o.y + o.h - 4, 4, 3);
+  px(o.x + o.w - 10, o.y + o.h - 4, 4, 3);
+  // headlight
+  ctx.fillStyle = '#fff8a0';
+  px(o.x + o.w - 3, o.y + 8, 3, 3);
+}
+
+function drawCar(o) {
+  // moving car (sportier, red)
+  ctx.fillStyle = '#c83020';
+  px(o.x, o.y + 2, o.w, o.h - 6);
+  ctx.fillStyle = '#e85040';
+  px(o.x, o.y + 2, o.w, 2);
+  // roof curve
+  ctx.fillStyle = '#a01010';
+  px(o.x + 6, o.y - 2, o.w - 12, 4);
+  // windows
+  ctx.fillStyle = '#aae0ff';
+  px(o.x + 8, o.y - 1, 6, 3);
+  px(o.x + o.w - 14, o.y - 1, 6, 3);
+  // wheels
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 3, o.y + o.h - 4, 8, 4);
+  px(o.x + o.w - 11, o.y + o.h - 4, 8, 4);
+  // wheel spokes (animated)
+  ctx.fillStyle = '#666';
+  const spoke = Math.floor(frameCount * 0.5) % 2;
+  px(o.x + 5 + spoke, o.y + o.h - 3, 4, 2);
+  px(o.x + o.w - 9 - spoke, o.y + o.h - 3, 4, 2);
+  // headlights (depending on direction)
+  ctx.fillStyle = '#fff8a0';
+  if (!o.mv || o.mv.speed < 0 || o.mv.type === 'loop_left') {
+    px(o.x, o.y + 4, 2, 3);
+  } else {
+    px(o.x + o.w - 2, o.y + 4, 2, 3);
+  }
+}
+
+function drawTruck(o) {
+  // big truck (cab + box)
+  ctx.fillStyle = '#3a6a3a';
+  px(o.x, o.y + 2, o.w - 16, o.h - 6);
+  ctx.fillStyle = '#5a8a5a';
+  px(o.x, o.y + 2, o.w - 16, 2);
+  // cab
+  ctx.fillStyle = '#7a4a2a';
+  px(o.x + o.w - 18, o.y + 4, 18, o.h - 8);
+  ctx.fillStyle = '#9a6a4a';
+  px(o.x + o.w - 18, o.y + 4, 18, 2);
+  // window
+  ctx.fillStyle = '#aae0ff';
+  px(o.x + o.w - 14, o.y + 6, 10, 4);
+  // wheels
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 4, o.y + o.h - 4, 8, 4);
+  px(o.x + o.w / 2 - 4, o.y + o.h - 4, 8, 4);
+  px(o.x + o.w - 12, o.y + o.h - 4, 8, 4);
+  // logo on side
+  ctx.fillStyle = COL.WHITE;
+  px(o.x + 6, o.y + 8, 12, 6);
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 8, o.y + 10, 8, 2);
+  // headlights
+  ctx.fillStyle = '#fff8a0';
+  if (!o.mv || o.mv.type === 'loop_left') {
+    px(o.x, o.y + o.h / 2, 2, 4);
+  }
+}
+
+function drawBench(o) {
+  // park bench
+  ctx.fillStyle = COL.LOG_DK;
+  // legs
+  px(o.x + 4, o.y + 6, 4, o.h - 6);
+  px(o.x + o.w - 8, o.y + 6, 4, o.h - 6);
+  // seat
+  ctx.fillStyle = COL.LOG;
+  px(o.x, o.y, o.w, 6);
+  ctx.fillStyle = COL.LOG_LT;
+  px(o.x, o.y, o.w, 2);
+  // slats
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x, o.y + 3, o.w, 1);
+}
+
+function drawHedge(o) {
+  // green leafy hedge
+  ctx.fillStyle = '#2a6a30';
+  px(o.x, o.y + 2, o.w, o.h - 2);
+  ctx.fillStyle = '#3a8a30';
+  for (let i = 0; i < o.w; i += 6) {
+    px(o.x + i, o.y, 5, 4);
+  }
+  ctx.fillStyle = '#5cba4a';
+  for (let i = 2; i < o.w; i += 8) {
+    px(o.x + i, o.y + 2, 3, 2);
+  }
+  ctx.fillStyle = '#1a4a1a';
+  px(o.x, o.y + o.h - 1, o.w, 1);
+}
+
+function drawGnome(o) {
+  // little garden gnome
+  // body
+  ctx.fillStyle = '#0a4ab8';
+  px(o.x + 2, o.y + 6, 8, 8);
+  // beard (white)
+  ctx.fillStyle = COL.WHITE;
+  px(o.x + 3, o.y + 4, 6, 4);
+  // face
+  ctx.fillStyle = '#f4d8a8';
+  px(o.x + 4, o.y + 3, 4, 3);
+  // eyes
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 5, o.y + 4, 1, 1);
+  px(o.x + 7, o.y + 4, 1, 1);
+  // hat (red pointy)
+  ctx.fillStyle = '#c82010';
+  px(o.x + 2, o.y, 8, 3);
+  px(o.x + 4, o.y - 2, 4, 2);
+  // base/feet
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 1, o.y + o.h - 1, o.w - 2, 1);
+}
+
+function drawDog(o) {
+  // brown patrol dog
+  ctx.save();
+  if (o.mv && o.mv.dir < 0) {
+    ctx.translate(Math.floor(o.x + o.w), Math.floor(o.y));
+    ctx.scale(-1, 1);
+    ctx.translate(-o.w, 0);
+  } else {
+    ctx.translate(Math.floor(o.x), Math.floor(o.y));
+  }
+  // body
+  ctx.fillStyle = '#7a4a2a';
+  px(0, 4, o.w - 4, o.h - 6);
+  ctx.fillStyle = '#9a6a3a';
+  px(0, 4, o.w - 4, 2);
+  // head
+  ctx.fillStyle = '#7a4a2a';
+  px(o.w - 10, 0, 10, 8);
+  // ear
+  ctx.fillStyle = '#5a3a1a';
+  px(o.w - 8, -2, 4, 4);
+  // eye
+  ctx.fillStyle = COL.BLACK;
+  px(o.w - 4, 3, 1, 1);
+  // snout
+  ctx.fillStyle = COL.BLACK;
+  px(o.w - 2, 5, 2, 2);
+  // legs
+  const walkPhase = Math.floor(frameCount * 0.2) % 2;
+  ctx.fillStyle = '#5a3a1a';
+  px(2, o.h - 4, 3, 4);
+  px(o.w - 12, o.h - 4, 3, 4);
+  px(2 + walkPhase, o.h - 2, 2, 2);
+  px(o.w - 12 - walkPhase, o.h - 2, 2, 2);
+  // tail
+  ctx.fillStyle = '#7a4a2a';
+  px(-3, 5, 4, 2);
+  ctx.restore();
+}
+
+function drawWheelieBin(o) {
+  // green wheelie bin
+  ctx.fillStyle = '#2a6a3a';
+  px(o.x, o.y + 2, o.w, o.h - 4);
+  ctx.fillStyle = '#3a8a4a';
+  px(o.x, o.y + 2, 2, o.h - 4);
+  ctx.fillStyle = '#1a4a2a';
+  px(o.x + o.w - 2, o.y + 2, 2, o.h - 4);
+  // lid
+  ctx.fillStyle = '#1a4a2a';
+  px(o.x - 1, o.y, o.w + 2, 4);
+  // wheel
+  ctx.fillStyle = COL.BLACK;
+  px(o.x + 2, o.y + o.h - 2, o.w - 4, 2);
+  // ribs
+  ctx.fillStyle = '#1a4a2a';
+  px(o.x + 2, o.y + o.h / 2, o.w - 4, 1);
+}
+
+function drawBarrier(o) {
+  // concrete jersey barrier
+  ctx.fillStyle = '#a0a0a0';
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = '#c0c0c0';
+  px(o.x, o.y, o.w, 2);
+  px(o.x, o.y, 2, o.h);
+  ctx.fillStyle = '#606060';
+  px(o.x + o.w - 2, o.y, 2, o.h);
+  px(o.x, o.y + o.h - 2, o.w, 2);
+  // angled stripes (orange/black warning)
+  ctx.fillStyle = '#fbb02c';
+  px(o.x + 4, o.y + 4, o.w - 8, 4);
+  ctx.fillStyle = COL.BLACK;
+  for (let i = 0; i < o.w - 6; i += 4) {
+    px(o.x + 4 + i, o.y + 4, 2, 4);
+  }
+  // base flare
+  ctx.fillStyle = '#808080';
+  px(o.x - 1, o.y + o.h - 4, o.w + 2, 4);
+}
+
+function drawTreeRoot(o) {
+  // gnarled root arching at head height
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x, o.y + 2, o.w, 4);
+  ctx.fillStyle = COL.LOG;
+  px(o.x, o.y + 2, o.w, 2);
+  // bumps
+  ctx.fillStyle = COL.LOG_DK;
+  for (let i = 4; i < o.w - 4; i += 8) {
+    px(o.x + i, o.y, 3, 2);
+    px(o.x + i + 4, o.y + 6, 3, 2);
+  }
+  // tree side connection
+  ctx.fillStyle = COL.LOG_DK;
+  px(o.x - 4, o.y - 4, 4, 16);
+  ctx.fillStyle = '#3a8a30';
+  px(o.x - 8, o.y - 6, 6, 6);
+}
+
+function drawBoulder(o) {
+  // rolling boulder (rotates)
+  ctx.save();
+  const cx = o.x + o.w / 2;
+  const cy = o.y + o.h / 2;
+  ctx.translate(Math.floor(cx), Math.floor(cy));
+  if (o.mv) ctx.rotate(o.mv.rot || 0);
+  const r = o.w / 2;
+  // dark rim
+  ctx.fillStyle = COL.ROCK_DK;
+  px(-r, -r, o.w, o.h);
+  // fill
+  ctx.fillStyle = COL.ROCK;
+  px(-r + 2, -r + 1, o.w - 4, o.h - 2);
+  px(-r + 1, -r + 2, o.w - 2, o.h - 4);
+  // highlight
+  ctx.fillStyle = COL.ROCK_LT;
+  px(-r + 3, -r + 3, 5, 2);
+  px(-r + 5, -r + 5, 3, 2);
+  // dark spot (rotates with boulder)
+  ctx.fillStyle = COL.ROCK_DK;
+  px(-2, -1, 4, 3);
+  ctx.restore();
+}
+
+function drawIcePatch(o) {
+  // light blue ice on ground
+  ctx.fillStyle = '#8af0ff';
+  px(o.x, o.y, o.w, o.h);
+  ctx.fillStyle = '#c0f8ff';
+  px(o.x, o.y, o.w, 1);
+  ctx.fillStyle = '#5ad0e8';
+  for (let i = 4; i < o.w; i += 10) {
+    px(o.x + i, o.y + 2, 4, 1);
+  }
+  ctx.fillStyle = '#fff';
+  for (let i = 0; i < o.w; i += 16) {
+    px(o.x + i + 2, o.y, 1, 1);
+    px(o.x + i + 8, o.y + 1, 1, 1);
+  }
+}
+
+function drawRollingLog(o) {
+  // log that rotates
+  ctx.save();
+  const cx = o.x + o.w / 2;
+  const cy = o.y + o.h / 2;
+  ctx.translate(Math.floor(cx), Math.floor(cy));
+  if (o.mv) ctx.rotate(o.mv.rot || 0);
+  const hw = o.w / 2;
+  const hh = o.h / 2;
+  ctx.fillStyle = COL.LOG;
+  px(-hw, -hh + 1, o.w, o.h - 2);
+  ctx.fillStyle = COL.LOG_LT;
+  px(-hw, -hh + 1, o.w, 2);
+  ctx.fillStyle = COL.LOG_DK;
+  px(-hw, hh - 3, o.w, 2);
+  // bark stripes (rotate visual)
+  ctx.fillStyle = COL.LOG_DK;
+  for (let i = -hw + 4; i < hw - 4; i += 6) {
+    px(i, -hh + 3, 2, o.h - 6);
+  }
+  // end caps
+  ctx.fillStyle = COL.LOG_LT;
+  px(-hw - 1, -hh + 2, 2, o.h - 4);
+  px(hw - 1, -hh + 2, 2, o.h - 4);
+  ctx.restore();
+}
+
+function drawFountain(o) {
+  // round stone fountain
+  ctx.fillStyle = '#7a7a7a';
+  px(o.x, o.y + 6, o.w, o.h - 6);
+  ctx.fillStyle = '#9a9a9a';
+  px(o.x, o.y + 6, o.w, 2);
+  ctx.fillStyle = '#5a5a5a';
+  px(o.x, o.y + o.h - 4, o.w, 4);
+  // water in basin
+  ctx.fillStyle = COL.WATER;
+  px(o.x + 4, o.y + 4, o.w - 8, 6);
+  ctx.fillStyle = COL.WATER_LT;
+  px(o.x + 6, o.y + 4, 4, 1);
+  // central spout
+  ctx.fillStyle = '#7a7a7a';
+  px(o.x + o.w / 2 - 2, o.y - 4, 4, 8);
+  // water spray (animated)
+  const spray = (frameCount % 30) < 15 ? 1 : 0;
+  ctx.fillStyle = COL.WATER_LT;
+  px(o.x + o.w / 2 - 1, o.y - 8 - spray, 2, 4 + spray);
+  ctx.fillStyle = COL.WHITE;
+  px(o.x + o.w / 2 - 4, o.y - 6, 2, 1);
+  px(o.x + o.w / 2 + 2, o.y - 6, 2, 1);
+}
+
+function drawOutcrop(o) {
+  // rocky outcropping (climbable)
+  ctx.fillStyle = COL.ROCK_DK;
+  px(o.x, o.y + 2, o.w, o.h - 2);
+  ctx.fillStyle = COL.ROCK;
+  px(o.x + 1, o.y + 2, o.w - 2, o.h - 4);
+  ctx.fillStyle = COL.ROCK_LT;
+  px(o.x + 2, o.y, o.w - 4, 4);
+  px(o.x + 4, o.y + 4, 6, 2);
+  // crack lines
+  ctx.fillStyle = COL.ROCK_DK;
+  for (let i = 4; i < o.h - 2; i += 6) {
+    px(o.x + 4, o.y + i, 1, 3);
+    px(o.x + o.w - 6, o.y + i + 2, 1, 3);
+  }
+  // ledge
+  ctx.fillStyle = COL.ROCK_LT;
+  px(o.x, o.y + 2, o.w, 1);
+}
+
+function drawBigDen(o) {
+  // larger, more elaborate home den
+  ctx.fillStyle = '#7ada5a';
+  for (let i = 0; i < o.w; i += 2) {
+    const cx = i - o.w / 2;
+    const inset = Math.floor((cx * cx) / (o.w * 0.6));
+    px(o.x + i, o.y + inset, 2, o.h - inset + 16);
+  }
+  ctx.fillStyle = COL.GRASS_DK;
+  for (let i = 0; i < o.w; i += 4) {
+    const cx = i - o.w / 2;
+    const inset = Math.floor((cx * cx) / (o.w * 0.6));
+    px(o.x + i, o.y + inset, 1, 2);
+  }
+  // large cave mouth
+  const dx = o.x + o.w / 2 - 14;
+  const dy = o.y + o.h - 32;
+  ctx.fillStyle = '#1a0808';
+  px(dx - 2, dy, 32, 32);
+  ctx.fillStyle = COL.DEN;
+  px(dx, dy + 2, 28, 30);
+  // stone arch
+  ctx.fillStyle = '#7a5a3a';
+  px(dx - 2, dy, 2, 6);
+  px(dx + 28, dy, 2, 6);
+  // welcome flowers / decoration
+  ctx.fillStyle = COL.FRUIT;
+  px(o.x + o.w / 2 - 14, dy + 24, 2, 2);
+  px(o.x + o.w / 2 + 12, dy + 24, 2, 2);
+  ctx.fillStyle = COL.GOLD;
+  px(o.x + o.w / 2 - 13, dy + 25, 1, 1);
+  px(o.x + o.w / 2 + 13, dy + 25, 1, 1);
+  // bamboo plants beside den
+  ctx.fillStyle = COL.BAMBOO;
+  px(o.x - 4, dy + 12, 2, 20);
+  px(o.x + o.w + 2, dy + 12, 2, 20);
+  ctx.fillStyle = COL.LEAF;
+  px(o.x - 6, dy + 8, 4, 4);
+  px(o.x + o.w + 1, dy + 8, 4, 4);
+}
+
+// ============================================================
+// MOVING OBSTACLES UPDATE
+// ============================================================
+function updateMovingObstacles() {
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (!ob.mv) continue;
+    const mv = ob.mv;
+    if (mv.type === 'patrol') {
+      ob.x += mv.dir * mv.speed;
+      if (ob.x >= mv.baseX + mv.range) {
+        ob.x = mv.baseX + mv.range;
+        mv.dir = -1;
+      } else if (ob.x <= mv.baseX) {
+        ob.x = mv.baseX;
+        mv.dir = 1;
+      }
+      if (mv.rotates) {
+        mv.rot = (mv.rot || 0) + mv.dir * mv.speed * 0.12;
+      }
+    } else if (mv.type === 'loop_left') {
+      ob.x -= mv.speed;
+      if (ob.x + ob.w < -50) ob.x = LEVEL_W + 30;
+      if (mv.rotates) mv.rot = (mv.rot || 0) - mv.speed * 0.12;
+    } else if (mv.type === 'loop_right') {
+      ob.x += mv.speed;
+      if (ob.x > LEVEL_W + 30) ob.x = -ob.w - 30;
+      if (mv.rotates) mv.rot = (mv.rot || 0) + mv.speed * 0.12;
+    }
+  }
+}
+
+// ============================================================
+// HUD
+// ============================================================
+function drawHud() {
+  // Health bar
+  ctx.fillStyle = COL.BLACK;
+  ctx.fillRect(6, 6, 104, 12);
+  ctx.fillStyle = '#444';
+  ctx.fillRect(8, 8, 100, 8);
+  // health color: green > yellow > red
+  let hcol;
+  if (player.health > 60) hcol = '#5cba4a';
+  else if (player.health > 30) hcol = '#fbd02c';
+  else hcol = '#e84a3a';
+  ctx.fillStyle = hcol;
+  ctx.fillRect(8, 8, player.health, 8);
+  // border highlights
+  ctx.fillStyle = COL.WHITE;
+  ctx.fillRect(8, 8, 100, 1);
+
+  // Heart icon
+  ctx.fillStyle = '#e84a3a';
+  ctx.fillRect(112, 8, 2, 2);
+  ctx.fillRect(116, 8, 2, 2);
+  ctx.fillRect(110, 10, 8, 2);
+  ctx.fillRect(112, 12, 6, 1);
+  ctx.fillRect(114, 13, 2, 1);
+
+  // Score
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.lineWidth = 2;
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'top';
+  const scoreText = 'SCORE ' + score;
+  ctx.strokeText(scoreText, VW - 6, 6);
+  ctx.fillText(scoreText, VW - 6, 6);
+
+  // Mute indicator
+  if (audio.muted) {
+    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillStyle = '#ff6666';
+    ctx.strokeStyle = COL.BLACK;
+    ctx.lineWidth = 2;
+    ctx.strokeText('MUTED  [M]', VW - 6, 22);
+    ctx.fillText('MUTED  [M]', VW - 6, 22);
+  }
+  ctx.textAlign = 'left';
+}
+
+// ============================================================
+// HINT TEXT (in world space)
+// ============================================================
+function worldText(text, x, y, size) {
+  size = size || 10;
+  ctx.font = 'bold ' + size + 'px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText(text, x, y);
+  ctx.fillText(text, x, y);
+  ctx.textAlign = 'left';
+}
+
+function drawHints() {
+  if (currentLevel !== 1) return;
+  worldText('< - >  MOVE',     150, 150, 9);
+  worldText('SPACE / UP = JUMP', 380, 130, 9);
+  worldText('UP TO CLIMB',      1500, 130, 9);
+  worldText('DOWN = DUCK',      2900, 145, 9);
+}
+
+// ============================================================
+// THEMED BACKGROUNDS (deterministic, no per-frame randomness)
+// ============================================================
+function drawBgZoo() {
+  drawSkyGradient();
+  drawFarBg();
+  drawMidBg();
+}
+
+function drawBgZoo2() {
+  drawSkyGradient();
+  drawFarBg();
+  // Trees behind fence
+  const treeOff = (camera.x * 0.5);
+  for (let i = -1; i < 10; i++) {
+    const x = i * 100 - (treeOff % 100);
+    drawTreeBg(x + 10, 130);
+  }
+  // Colorful zoo signs in mid bg
+  const signOff = (camera.x * 0.5);
+  const signColors = ['#e84a3a', '#fbd02c', '#5cba4a', '#3b82c4', '#9a4ac8'];
+  for (let i = -1; i < 12; i++) {
+    const x = i * 160 - (signOff % 160);
+    const col = signColors[((i + 100) % signColors.length)];
+    ctx.fillStyle = '#5b3a1b';
+    px(x + 38, 152, 4, 30);
+    ctx.fillStyle = col;
+    px(x + 22, 138, 36, 18);
+    ctx.fillStyle = COL.WHITE;
+    px(x + 26, 142, 28, 2);
+    px(x + 26, 148, 18, 2);
+    px(x + 26, 152, 24, 2);
+  }
+  // Fence
+  const fenceOff = (camera.x * 0.5);
+  ctx.fillStyle = COL.FENCE;
+  for (let i = -1; i < 32; i++) {
+    const x = i * 16 - (fenceOff % 16);
+    px(x, 168, 3, 36);
+  }
+  ctx.fillStyle = COL.FENCE_DK;
+  for (let i = -1; i < 32; i++) {
+    const x = i * 16 - (fenceOff % 16);
+    px(x, 166, 3, 2);
+  }
+  px(0, 175, VW, 2);
+  px(0, 195, VW, 2);
+}
+
+function drawBgCityAlley() {
+  // Night/dim sky
+  ctx.fillStyle = '#1a1a3a';
+  ctx.fillRect(0, 0, VW, 90);
+  ctx.fillStyle = '#2a2a4a';
+  ctx.fillRect(0, 90, VW, 110);
+  // Distant buildings (parallax 0.2)
+  const bgOff = (camera.x * 0.2);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 90 - (bgOff % 90);
+    const h = 60 + ((i * 17) % 30);
+    ctx.fillStyle = '#15152a';
+    px(x, 200 - h, 70, h);
+    ctx.fillStyle = '#252540';
+    px(x, 200 - h, 2, h);
+    // dim windows (deterministic by building index, NOT frameCount)
+    ctx.fillStyle = '#5a5a40';
+    for (let wy = 6; wy < h - 4; wy += 8) {
+      for (let wx = 4; wx < 66; wx += 10) {
+        const bit = ((i * 31 + wx * 7 + wy * 13) % 100);
+        if (bit < 50) px(x + wx, 200 - h + wy, 4, 4);
+      }
+    }
+  }
+  // Mid buildings (parallax 0.5) — taller, more visible windows
+  const midOff = (camera.x * 0.5);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 130 - (midOff % 130);
+    const h = 80 + ((i * 23) % 30);
+    ctx.fillStyle = '#3a2a3a';
+    px(x, 200 - h, 100, h);
+    ctx.fillStyle = '#5a3a4a';
+    px(x, 200 - h, 100, 2);
+    px(x, 200 - h, 2, h);
+    // brick texture
+    ctx.fillStyle = '#2a1a2a';
+    for (let by = 0; by < h; by += 6) {
+      const off = (by / 6) % 2 === 0 ? 0 : 6;
+      for (let bx = off; bx < 100; bx += 12) {
+        px(x + bx, 200 - h + by + 4, 2, 1);
+      }
+    }
+    // lit windows
+    for (let wy = 8; wy < h - 6; wy += 12) {
+      for (let wx = 6; wx < 94; wx += 14) {
+        const bit = ((i * 37 + wx * 11 + wy * 17) % 100);
+        if (bit < 60) {
+          ctx.fillStyle = '#fbd02c';
+          px(x + wx, 200 - h + wy, 6, 6);
+          ctx.fillStyle = '#fff8a0';
+          px(x + wx + 1, 200 - h + wy + 1, 2, 2);
+        } else {
+          ctx.fillStyle = '#1a1a2a';
+          px(x + wx, 200 - h + wy, 6, 6);
+        }
+      }
+    }
+  }
+  // some moon
+  ctx.fillStyle = '#f4f4d8';
+  px(VW - 80, 25, 14, 14);
+  ctx.fillStyle = '#1a1a3a';
+  px(VW - 76, 23, 8, 8);
+}
+
+function drawBgCityStreet() {
+  // Bright day sky
+  ctx.fillStyle = '#aae0f0';
+  ctx.fillRect(0, 0, VW, 90);
+  ctx.fillStyle = '#cfeefa';
+  ctx.fillRect(0, 90, VW, 110);
+  // Some clouds (parallax 0.15)
+  const cloudOff = (camera.x * 0.15);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 200 - (cloudOff % 200);
+    drawCloud(x + 30, 25, 1);
+    drawCloud(x + 130, 50, 1);
+  }
+  // Distant buildings (parallax 0.3)
+  const bgOff = (camera.x * 0.3);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 130 - (bgOff % 130);
+    const h = 60 + ((i * 19) % 30);
+    ctx.fillStyle = '#7a8aaa';
+    px(x, 200 - h, 110, h);
+    ctx.fillStyle = '#9aaacc';
+    px(x, 200 - h, 110, 2);
+    // windows
+    ctx.fillStyle = '#aae0ff';
+    for (let wy = 6; wy < h - 4; wy += 8) {
+      for (let wx = 4; wx < 106; wx += 12) {
+        px(x + wx, 200 - h + wy, 6, 4);
+      }
+    }
+  }
+  // Mid storefronts (parallax 0.55)
+  const midOff = (camera.x * 0.55);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 110 - (midOff % 110);
+    const colors = ['#e84a3a', '#5cba4a', '#3b82c4', '#fbd02c'];
+    const col = colors[((i + 100) % colors.length)];
+    // store body
+    ctx.fillStyle = '#9a6a3a';
+    px(x, 130, 100, 70);
+    // colored awning
+    ctx.fillStyle = col;
+    px(x, 130, 100, 8);
+    ctx.fillStyle = COL.WHITE;
+    for (let s = 0; s < 100; s += 10) px(x + s + 4, 130, 2, 8);
+    // store window
+    ctx.fillStyle = '#cfeefa';
+    px(x + 8, 144, 84, 32);
+    ctx.fillStyle = COL.WHITE;
+    px(x + 8, 144, 84, 2);
+    // door
+    ctx.fillStyle = '#5b3a1b';
+    px(x + 40, 168, 16, 32);
+    // sign letters
+    ctx.fillStyle = COL.WHITE;
+    px(x + 16, 150, 4, 4);
+    px(x + 26, 150, 6, 4);
+    px(x + 38, 150, 4, 4);
+  }
+  // sidewalk strip
+  ctx.fillStyle = '#8a8a8a';
+  px(0, 196, VW, 4);
+  ctx.fillStyle = '#6a6a6a';
+  for (let i = 0; i < VW; i += 16) px(i, 198, 1, 2);
+}
+
+function drawBgPark() {
+  // standard sky
+  drawSkyGradient();
+  // distant hills
+  const hillOff = (camera.x * 0.3);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 200 - (hillOff % 200);
+    drawHill(x, 130, 200, COL.HILL_FAR);
+  }
+  // lots of trees (parallax 0.5)
+  const treeOff = (camera.x * 0.5);
+  for (let i = -1; i < 12; i++) {
+    const x = i * 80 - (treeOff % 80);
+    drawTreeBg(x, 120);
+  }
+  // shorter trees in front
+  const tree2Off = (camera.x * 0.6);
+  for (let i = -1; i < 12; i++) {
+    const x = i * 110 - (tree2Off % 110);
+    ctx.fillStyle = COL.LOG_DK;
+    px(x + 12, 168, 3, 32);
+    ctx.fillStyle = COL.HILL_NEAR;
+    px(x + 4, 156, 18, 14);
+    px(x, 160, 26, 8);
+  }
+}
+
+function drawBgSuburbs() {
+  drawSkyGradient();
+  // distant trees / hills
+  const hillOff = (camera.x * 0.3);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 200 - (hillOff % 200);
+    drawHill(x, 145, 180, COL.HILL_FAR);
+  }
+  // Houses (parallax 0.5)
+  const houseOff = (camera.x * 0.5);
+  const houseColors = ['#dccab8', '#e8d8c0', '#cbb89a', '#b8a888', '#d8b8a8'];
+  for (let i = -1; i < 8; i++) {
+    const x = i * 130 - (houseOff % 130);
+    const col = houseColors[((i + 100) % houseColors.length)];
+    // house body
+    ctx.fillStyle = col;
+    px(x + 10, 140, 100, 60);
+    // roof (triangle approx)
+    ctx.fillStyle = '#6a3a2a';
+    for (let r = 0; r < 30; r += 2) {
+      const w = 120 - r * 4;
+      px(x + 60 - w / 2, 130 - r, w, 2);
+    }
+    ctx.fillStyle = '#4a1a1a';
+    px(x + 5, 138, 110, 2);
+    // door
+    ctx.fillStyle = '#6a3a2a';
+    px(x + 50, 170, 16, 30);
+    ctx.fillStyle = '#fbd02c';
+    px(x + 62, 184, 1, 1);
+    // windows
+    ctx.fillStyle = '#aae0ff';
+    px(x + 20, 152, 14, 14);
+    px(x + 84, 152, 14, 14);
+    ctx.fillStyle = COL.WHITE;
+    px(x + 26, 152, 2, 14);
+    px(x + 20, 158, 14, 1);
+    px(x + 90, 152, 2, 14);
+    px(x + 84, 158, 14, 1);
+    // chimney
+    ctx.fillStyle = '#7a4a2a';
+    px(x + 80, 110, 8, 22);
+  }
+}
+
+function drawBgHighway() {
+  // night sky
+  ctx.fillStyle = '#1a1a4a';
+  ctx.fillRect(0, 0, VW, 60);
+  ctx.fillStyle = '#3a2a5a';
+  ctx.fillRect(0, 60, VW, 60);
+  ctx.fillStyle = '#5a3a6a';
+  ctx.fillRect(0, 120, VW, 80);
+  // stars (deterministic)
+  ctx.fillStyle = COL.WHITE;
+  for (let i = 0; i < 40; i++) {
+    const sx = (i * 53 + 17) % VW;
+    const sy = (i * 31 + 7) % 60;
+    px(sx, sy, 1, 1);
+  }
+  // Distant city skyline (parallax 0.2)
+  const skyOff = (camera.x * 0.2);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 100 - (skyOff % 100);
+    const h = 50 + ((i * 13) % 25);
+    ctx.fillStyle = '#0a0a2a';
+    px(x, 130 - h, 80, h);
+    // windows
+    ctx.fillStyle = '#fbd02c';
+    for (let wy = 4; wy < h - 4; wy += 6) {
+      for (let wx = 3; wx < 76; wx += 8) {
+        const bit = ((i * 41 + wx * 7 + wy * 11) % 100);
+        if (bit < 35) px(x + wx, 130 - h + wy, 3, 3);
+      }
+    }
+  }
+  // overpass / mid concrete
+  const midOff = (camera.x * 0.5);
+  for (let i = -1; i < 12; i++) {
+    const x = i * 60 - (midOff % 60);
+    ctx.fillStyle = '#5a5a5a';
+    px(x, 165, 50, 4);
+    ctx.fillStyle = '#3a3a3a';
+    px(x + 20, 169, 8, 31);
+  }
+  // roadway markings strip
+  ctx.fillStyle = '#fbd02c';
+  for (let i = 0; i < VW; i += 24) {
+    px(((i - camera.x * 0.8) % 24 + VW) % 24 + Math.floor(i / 24) * 24, 196, 12, 2);
+  }
+}
+
+function drawBgForest() {
+  // hazy green-tinted sky
+  ctx.fillStyle = '#a8d090';
+  ctx.fillRect(0, 0, VW, 90);
+  ctx.fillStyle = '#bfe0b0';
+  ctx.fillRect(0, 90, VW, 110);
+  // distant trees (parallax 0.2)
+  const farOff = (camera.x * 0.2);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 80 - (farOff % 80);
+    ctx.fillStyle = '#3a6a3a';
+    px(x, 100, 70, 100);
+    ctx.fillStyle = '#2a5a2a';
+    px(x + 8, 90, 50, 14);
+    px(x + 4, 100, 60, 10);
+  }
+  // mid trees (parallax 0.5) — denser
+  const midOff = (camera.x * 0.5);
+  for (let i = -1; i < 12; i++) {
+    const x = i * 70 - (midOff % 70);
+    // trunk
+    ctx.fillStyle = '#3a2a1a';
+    px(x + 20, 168, 8, 32);
+    ctx.fillStyle = '#5a3a2a';
+    px(x + 20, 168, 2, 32);
+    // foliage
+    ctx.fillStyle = '#3a8a30';
+    px(x + 4, 130, 40, 36);
+    px(x, 140, 48, 24);
+    ctx.fillStyle = '#5cba4a';
+    px(x + 10, 134, 8, 6);
+    px(x + 24, 142, 6, 6);
+    px(x + 32, 152, 6, 6);
+  }
+  // dappled light spots
+  ctx.fillStyle = 'rgba(255,240,180,0.3)';
+  for (let i = 0; i < 8; i++) {
+    const sx = ((i * 67 + 30 - camera.x * 0.4) % VW + VW) % VW;
+    px(sx, 170 + (i % 2) * 8, 16, 4);
+  }
+}
+
+function drawBgMountain() {
+  // bright high-altitude sky
+  ctx.fillStyle = '#7ec0ff';
+  ctx.fillRect(0, 0, VW, 90);
+  ctx.fillStyle = '#bfe0ff';
+  ctx.fillRect(0, 90, VW, 110);
+  // far snow peaks (parallax 0.2)
+  const farOff = (camera.x * 0.2);
+  for (let i = -1; i < 6; i++) {
+    const x = i * 180 - (farOff % 180);
+    // mountain triangle approx with stacked rects
+    ctx.fillStyle = '#7a7a9a';
+    for (let r = 0; r < 80; r += 2) {
+      const w = 160 - r * 2;
+      if (w > 0) px(x + 80 - w / 2, 110 + r, w, 2);
+    }
+    // snow cap
+    ctx.fillStyle = COL.WHITE;
+    for (let r = 0; r < 24; r += 2) {
+      const w = 50 - r * 2;
+      if (w > 0) px(x + 80 - w / 2, 110 + r, w, 2);
+    }
+  }
+  // mid rocks (parallax 0.5)
+  const midOff = (camera.x * 0.5);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 100 - (midOff % 100);
+    ctx.fillStyle = '#8a8aa0';
+    px(x, 160, 80, 40);
+    ctx.fillStyle = '#aaaac0';
+    px(x, 160, 80, 4);
+    px(x, 160, 4, 40);
+    ctx.fillStyle = '#5a5a70';
+    px(x + 76, 160, 4, 40);
+    // snow patches
+    ctx.fillStyle = COL.WHITE;
+    px(x + 8, 162, 12, 2);
+    px(x + 50, 165, 16, 2);
+  }
+}
+
+function drawBgDeepForest() {
+  // bright forest sky (peeks through canopy)
+  ctx.fillStyle = '#7ec060';
+  ctx.fillRect(0, 0, VW, 60);
+  ctx.fillStyle = '#aae090';
+  ctx.fillRect(0, 60, VW, 50);
+  ctx.fillStyle = '#bce3a5';
+  ctx.fillRect(0, 110, VW, 90);
+  // light rays
+  ctx.fillStyle = 'rgba(255,255,180,0.2)';
+  for (let i = 0; i < 6; i++) {
+    const sx = ((i * 90 - camera.x * 0.2) % VW + VW) % VW;
+    px(sx, 0, 30, 110);
+  }
+  // far bamboo (parallax 0.2)
+  const farOff = (camera.x * 0.2);
+  for (let i = -1; i < 12; i++) {
+    const x = i * 50 - (farOff % 50);
+    ctx.fillStyle = '#3a8a30';
+    px(x + 20, 100, 4, 100);
+    ctx.fillStyle = '#5cba4a';
+    px(x + 21, 100, 1, 100);
+    // segments
+    ctx.fillStyle = '#2a6a20';
+    for (let s = 110; s < 200; s += 18) px(x + 19, s, 6, 2);
+    // leaves
+    ctx.fillStyle = '#5cba4a';
+    px(x + 14, 110, 8, 4);
+    px(x + 22, 130, 8, 4);
+  }
+  // mid trees + bamboo grove (parallax 0.5)
+  const midOff = (camera.x * 0.5);
+  for (let i = -1; i < 8; i++) {
+    const x = i * 100 - (midOff % 100);
+    // tree
+    ctx.fillStyle = '#3a2a1a';
+    px(x + 20, 168, 6, 32);
+    ctx.fillStyle = '#3a8a30';
+    px(x + 4, 130, 38, 38);
+    px(x, 140, 46, 24);
+    // bamboo cluster
+    for (let b = 0; b < 4; b++) {
+      ctx.fillStyle = '#3a8a30';
+      px(x + 60 + b * 6, 150, 3, 50);
+      ctx.fillStyle = '#5cba4a';
+      px(x + 61 + b * 6, 150, 1, 50);
+    }
+  }
+}
+
+function drawThemedBg() {
+  const meta = LEVEL_META[currentLevel];
+  const theme = meta ? meta.theme : 'zoo';
+  if (theme === 'zoo') drawBgZoo();
+  else if (theme === 'zoo2') drawBgZoo2();
+  else if (theme === 'city_alley') drawBgCityAlley();
+  else if (theme === 'city_street') drawBgCityStreet();
+  else if (theme === 'park') drawBgPark();
+  else if (theme === 'suburbs') drawBgSuburbs();
+  else if (theme === 'highway') drawBgHighway();
+  else if (theme === 'forest') drawBgForest();
+  else if (theme === 'mountain') drawBgMountain();
+  else if (theme === 'deep_forest') drawBgDeepForest();
+  else drawBgZoo();
+}
+
+// Theme-specific ground colors
+function drawGroundThemed() {
+  const meta = LEVEL_META[currentLevel];
+  const theme = meta ? meta.theme : 'zoo';
+  let topCol = COL.GRASS, midCol = COL.GRASS_DK, dirtCol = COL.DIRT, dirtDk = COL.DIRT_DK;
+  let drawBlades = true;
+  if (theme === 'city_alley' || theme === 'city_street' || theme === 'highway') {
+    topCol = '#5a5a5a'; midCol = '#3a3a3a'; dirtCol = '#2a2a2a'; dirtDk = '#1a1a1a';
+    drawBlades = false;
+  } else if (theme === 'mountain') {
+    topCol = '#9a9a9a'; midCol = '#7a7a7a'; dirtCol = '#5a5a5a'; dirtDk = '#3a3a3a';
+    drawBlades = false;
+  } else if (theme === 'forest' || theme === 'deep_forest') {
+    topCol = '#5cba4a'; midCol = '#2a6a20'; dirtCol = '#5a3a2a'; dirtDk = '#3a2a1a';
+  } else if (theme === 'suburbs') {
+    topCol = '#7ada5a'; midCol = '#3a8a30'; dirtCol = '#7a5a3a'; dirtDk = '#5a3a2a';
+  }
+  for (let i = 0; i < groundSegs.length; i++) {
+    const s = groundSegs[i][0], e = groundSegs[i][1];
+    ctx.fillStyle = topCol;     px(s, GROUND_Y, e - s, 4);
+    ctx.fillStyle = midCol;     px(s, GROUND_Y + 4, e - s, 2);
+    if (drawBlades) {
+      ctx.fillStyle = COL.GRASS_BLADE;
+      for (let x = s; x < e; x += 12) px(x + ((x * 7) % 8), GROUND_Y - 1, 1, 2);
+    }
+    ctx.fillStyle = dirtCol;    px(s, GROUND_Y + 6, e - s, VH - GROUND_Y - 6);
+    ctx.fillStyle = dirtDk;
+    for (let x = s; x < e; x += 24) {
+      px(x + 4, GROUND_Y + 12, 6, 2);
+      px(x + 14, GROUND_Y + 22, 4, 2);
+    }
+    if (theme === 'city_alley' || theme === 'city_street' || theme === 'highway') {
+      // road markings
+      ctx.fillStyle = '#fbd02c';
+      for (let x = s; x < e; x += 32) {
+        if (theme === 'highway') px(x, GROUND_Y + 14, 18, 2);
+      }
+    }
+  }
+}
+
+// ============================================================
+// UPDATE
+// ============================================================
+function clearKeyPressed() {
+  for (const k in keyPressed) keyPressed[k] = false;
+}
+
+function updateTitle() {
+  stateTimer++;
+  if (keyPressed['Space']) {
+    score = 0;
+    levelsCompleted = new Set();
+    storyPanel = 0;
+    gameState = STATE.STORY;
+    stateTimer = 0;
+  }
+}
+
+function updateGameOver() {
+  stateTimer++;
+  if (stateTimer > 30 && keyPressed['Space']) {
+    gameState = STATE.TITLE;
+    stateTimer = 0;
+  }
+}
+
+function updateWin() {
+  stateTimer++;
+  if (stateTimer > 30 && keyPressed['Space']) {
+    // Level complete → map screen
+    gameState = STATE.MAP;
+    stateTimer = 0;
+  }
+}
+
+function updateStory() {
+  stateTimer++;
+  if (stateTimer > 15 && keyPressed['Space']) {
+    storyPanel++;
+    stateTimer = 0;
+    if (storyPanel >= 3) {
+      // Done with story — start L1
+      loadLevel(1);
+      gameState = STATE.PLAYING;
+      stateTimer = 0;
+    }
+  }
+}
+
+function updateMap() {
+  stateTimer++;
+  if (stateTimer > 30 && keyPressed['Space']) {
+    // Advance to next level
+    const next = currentLevel + 1;
+    loadLevel(next);
+    gameState = STATE.PLAYING;
+    stateTimer = 0;
+  }
+}
+
+function updateGameWin() {
+  stateTimer++;
+  if (stateTimer > 60 && keyPressed['Space']) {
+    gameState = STATE.TITLE;
+    stateTimer = 0;
+  }
+}
+
+function findStreamAt(centerX) {
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (ob.type !== 'stream' && ob.type !== 'puddle') continue;
+    if (centerX >= ob.x && centerX < ob.x + ob.w) return ob;
+  }
+  return null;
+}
+
+function findClimbable() {
+  const pBox = getPlayerHitbox();
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (!SOLID_TYPES.has(ob.type)) continue;
+    // ladder zone: a strip on the left side of the object plus the body itself
+    const zone = { x: ob.x - 6, y: ob.y - 2, w: ob.w + 12, h: ob.h + 4 };
+    if (aabb(pBox, zone)) return ob;
+  }
+  return null;
+}
+
+function updatePlaying() {
+  const left = keys['ArrowLeft'];
+  const right = keys['ArrowRight'];
+  const up = keys['ArrowUp'];
+  const down = keys['ArrowDown'];
+  const upJustPressed = !!keyPressed['ArrowUp'];
+  const spaceJustPressed = !!keyPressed['Space'];
+
+  if (player.invincible > 0) player.invincible--;
+
+  const wasOnGround = player.onGround;
+
+  // Move all moving obstacles before collision
+  updateMovingObstacles();
+
+  // Detect ice patch under player feet (only matters when on ground)
+  let onIce = false;
+  if (player.onGround) {
+    const cx = player.x + player.w / 2;
+    for (let i = 0; i < obstacles.length; i++) {
+      const ob = obstacles[i];
+      if (ob.type !== 'ice') continue;
+      if (cx >= ob.x && cx < ob.x + ob.w) { onIce = true; break; }
+    }
+  }
+
+  const climbable = findClimbable();
+
+  // Climb start — only when player's feet are below the top of the object
+  // (prevents re-entering climb mode when already standing on top)
+  const pHbTemp = getPlayerHitbox();
+  if (!player.climbing && climbable && upJustPressed &&
+      pHbTemp.y + pHbTemp.h > climbable.y + 2) {
+    player.climbing = true;
+    player.vy = 0; player.vx = 0;
+    // Snap x near the side of the climbable so visuals make sense
+    if (player.x + player.w / 2 < climbable.x) {
+      player.x = climbable.x - player.w + 1;
+    } else if (player.x + player.w / 2 > climbable.x + climbable.w) {
+      player.x = climbable.x + climbable.w - 1;
+    }
+  }
+
+  if (player.climbing) {
+    player.vx = 0;
+    player.vy = 0;
+    if (up) player.y -= CLIMB_SPEED;
+    if (down) player.y += CLIMB_SPEED;
+    if (left) { player.x -= 1; player.facing = -1; }
+    if (right) { player.x += 1; player.facing = 1; }
+    player.state = 'climb';
+    player.animTimer++;
+    if (player.animTimer >= 8) {
+      player.animTimer = 0;
+      player.animFrame = (player.animFrame + 1) % 2;
+    }
+    if (spaceJustPressed) {
+      // jump off while climbing
+      player.climbing = false;
+      player.vy = JUMP_V * 0.8;
+      player.onGround = false;
+      playSfx('jump');
+    }
+    if (!climbable) {
+      player.climbing = false;
+    } else if (player.y + player.h <= climbable.y) {
+      // reached top — place feet on top
+      player.climbing = false;
+      player.y = climbable.y - player.h;
+      player.vy = 0;
+      player.onGround = true;
+      player.lastSafeX = player.x;
+      player.lastSafeY = player.y;
+    } else if (player.y + player.h > GROUND_Y) {
+      player.climbing = false;
+      player.y = GROUND_Y - player.h;
+    }
+  } else if (player.swimming) {
+    // Swimming physics — reduced speed, buoyancy, health drain
+    if (right && !left) { player.vx = WALK_SPEED * 0.55; player.facing = 1; }
+    else if (left && !right) { player.vx = -WALK_SPEED * 0.55; player.facing = -1; }
+    else player.vx *= 0.85;
+
+    if (spaceJustPressed || upJustPressed) {
+      player.vy = -2.5;
+      playSfx('jump');
+    } else {
+      player.vy += GRAVITY * 0.18;
+      if (player.vy > 1.2) player.vy = 1.2;
+    }
+
+    // Slow health drain while swimming
+    if (frameCount % 80 === 0) damage(4);
+
+    player.onGround = false;
+    player.ducking = false;
+
+  } else {
+    // Movement (ice gives momentum)
+    if (onIce) {
+      if (right && !left) {
+        player.vx = Math.min(player.vx + 0.18, WALK_SPEED);
+        player.facing = 1;
+      } else if (left && !right) {
+        player.vx = Math.max(player.vx - 0.18, -WALK_SPEED);
+        player.facing = -1;
+      } else {
+        player.vx *= 0.94;
+        if (Math.abs(player.vx) < 0.08) player.vx = 0;
+      }
+    } else {
+      if (right && !left) { player.vx = WALK_SPEED; player.facing = 1; }
+      else if (left && !right) { player.vx = -WALK_SPEED; player.facing = -1; }
+      else { player.vx = 0; }
+    }
+
+    // Duck — allow left/right movement while crouching (at reduced speed)
+    const wasDucking = player.ducking;
+    if (down && player.onGround) {
+      player.ducking = true;
+      if (!onIce) player.vx *= 0.6;
+    } else {
+      player.ducking = false;
+    }
+    if (player.ducking && !wasDucking) playSfx('duck');
+
+    // Jump
+    const jumpInput = spaceJustPressed || (upJustPressed && !climbable);
+    if (jumpInput && player.onGround && !player.ducking) {
+      player.vy = JUMP_V;
+      player.onGround = false;
+      playSfx('jump');
+    }
+
+    // Gravity
+    player.vy += GRAVITY;
+    if (player.vy > 12) player.vy = 12;
+  }
+
+  // === Move X/Y + Collision (runs for both swimming and normal, not climbing) ===
+  if (!player.climbing) {
+    // === Move X ===
+    player.x += player.vx;
+    // bounds
+    if (player.x < 0) player.x = 0;
+    if (player.x + player.w > LEVEL_W) player.x = LEVEL_W - player.w;
+
+    // Side collision with solid blocks
+    let pBox = getPlayerHitbox();
+    for (let i = 0; i < obstacles.length; i++) {
+      const ob = obstacles[i];
+      if (!SOLID_TYPES.has(ob.type)) continue;
+      // allow being on top
+      if (pBox.y + pBox.h <= ob.y + 2) continue;
+      if (aabb(pBox, ob)) {
+        damage(ob.dmg || 5);
+        if (player.vx > 0) player.x = ob.x - player.w;
+        else if (player.vx < 0) player.x = ob.x + ob.w;
+        else player.x = (player.x < ob.x) ? ob.x - player.w : ob.x + ob.w;
+        pBox = getPlayerHitbox();
+      }
+    }
+
+    // === Move Y ===
+    const oldFeet = pBox.y + pBox.h;
+    player.y += player.vy;
+    pBox = getPlayerHitbox();
+
+    // One-way platform top collision (any solid)
+    if (player.vy >= 0) {
+      for (let i = 0; i < obstacles.length; i++) {
+        const ob = obstacles[i];
+        if (!SOLID_TYPES.has(ob.type)) continue;
+        if (oldFeet <= ob.y + 1 && pBox.y + pBox.h > ob.y &&
+            pBox.x + pBox.w > ob.x && pBox.x < ob.x + ob.w) {
+          // land on top
+          const newY = ob.y - (player.ducking ? 14 : 24) - (player.ducking ? 10 : 0);
+          player.y = newY;
+          player.vy = 0;
+          player.onGround = true;
+          player.lastSafeX = player.x;
+          player.lastSafeY = player.y;
+          pBox = getPlayerHitbox();
+          break;
+        }
+      }
+    }
+
+    // Ground / stream collision
+    const feetY = pBox.y + pBox.h;
+    const playerCenter = player.x + player.w / 2;
+    if (feetY >= GROUND_Y) {
+      if (groundXAt(playerCenter)) {
+        const yOff = player.ducking ? 10 : 0;
+        const hitH = player.ducking ? 14 : 24;
+        player.y = GROUND_Y - hitH - yOff;
+        player.vy = 0;
+        player.onGround = true;
+        player.swimming = false;
+        player.lastSafeX = player.x;
+        player.lastSafeY = player.y;
+      } else {
+        player.onGround = false;
+        const stream = findStreamAt(playerCenter);
+        if (stream && feetY >= GROUND_Y + 4) {
+          // Enter / stay in water — swimming!
+          if (!player.swimming) {
+            player.swimming = true;
+            player.vy = Math.min(player.vy, 1.0);
+          }
+          // Clamp to stream bottom
+          if (player.y + 24 > GROUND_Y + stream.h - 2) {
+            player.y = GROUND_Y + stream.h - 2 - 24;
+            player.vy = 0;
+          }
+          // Popped back above surface — exit water
+          if (player.y + 24 < GROUND_Y) {
+            player.swimming = false;
+            player.vy = Math.min(player.vy, -1);
+          }
+        } else if (!stream && feetY >= GROUND_Y + 14) {
+          // Fell into a non-stream gap — damage and reset
+          damage(10);
+          player.x = player.lastSafeX;
+          player.y = player.lastSafeY;
+          player.vy = 0;
+          player.vx = 0;
+          player.onGround = true;
+          player.swimming = false;
+        }
+      }
+    } else {
+      // Check still on a platform
+      let stillSupported = false;
+      const checkY = pBox.y + pBox.h;
+      for (let i = 0; i < obstacles.length; i++) {
+        const ob = obstacles[i];
+        if (!SOLID_TYPES.has(ob.type)) continue;
+        if (Math.abs(checkY - ob.y) <= 1 &&
+            player.x + player.w > ob.x && player.x < ob.x + ob.w) {
+          stillSupported = true;
+          break;
+        }
+      }
+      if (!stillSupported && player.vy > 0.1) player.onGround = false;
+    }
+
+    // Hazard collision
+    pBox = getPlayerHitbox();
+    for (let i = 0; i < obstacles.length; i++) {
+      const ob = obstacles[i];
+      const isDuckable = HAZARD_DUCKABLE.has(ob.type);
+      const isGround = HAZARD_GROUND.has(ob.type);
+      if (!isDuckable && !isGround) continue;
+      if (isDuckable && player.ducking) continue;
+      if (!aabb(pBox, ob)) continue;
+      damage(ob.dmg || 15);
+      if (player.vx > 0) player.x -= 6;
+      else if (player.vx < 0) player.x += 6;
+      else player.x -= player.facing * 6;
+      if (player.vy > 0) player.vy = -3;
+    }
+
+    // Den / win
+    for (let i = 0; i < obstacles.length; i++) {
+      const ob = obstacles[i];
+      if (ob.type !== 'den') continue;
+      const denW = ob.big ? 32 : 24;
+      const denH = ob.big ? 32 : 24;
+      const denMouth = {
+        x: ob.x + ob.w / 2 - denW / 2,
+        y: ob.y + ob.h - denH,
+        w: denW, h: denH
+      };
+      if (aabb(pBox, denMouth)) {
+        levelsCompleted.add(currentLevel);
+        stopMusic();
+        if (currentLevel === 10) {
+          gameState = STATE.GAMEWIN;
+          playSfx('win');
+        } else {
+          gameState = STATE.WIN;
+          playSfx('level_complete');
+        }
+        stateTimer = 0;
+      }
+    }
+
+    // Animation state
+    if (player.swimming) player.state = player.animFrame % 2 === 0 ? 'walk' : 'jump';
+    else if (player.ducking) player.state = 'duck';
+    else if (!player.onGround) player.state = 'jump';
+    else if (player.vx !== 0) player.state = 'walk';
+    else player.state = 'idle';
+
+    player.animTimer++;
+    if (player.state === 'walk') {
+      if (player.animTimer >= 8) {
+        player.animTimer = 0;
+        player.animFrame = (player.animFrame + 1) % 2;
+      }
+    } else {
+      player.animFrame = 0;
+    }
+  } // end if (!player.climbing)
+
+  // Collectibles
+  const pickupBox = { x: player.x - 2, y: player.y - 2, w: player.w + 4, h: player.h + 4 };
+  for (let i = 0; i < collectibles.length; i++) {
+    const c = collectibles[i];
+    if (c.taken) continue;
+    const cBox = { x: c.x - 6, y: c.y - 8, w: 12, h: 16 };
+    if (aabb(pickupBox, cBox)) {
+      c.taken = true;
+      if (c.type === 'coin') {
+        score += 10;
+        playSfx('coin');
+      } else if (c.type === 'bamboo') {
+        player.health = Math.min(100, player.health + 15);
+        playSfx('food');
+      } else if (c.type === 'fruit') {
+        player.health = Math.min(100, player.health + 20);
+        playSfx('food');
+      }
+    }
+  }
+
+  // Score for passed obstacles
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (ob.type === 'den') continue;
+    if (player.x > ob.x + ob.w && !obstaclesPassed.has(i)) {
+      obstaclesPassed.add(i);
+      score += 2;
+    }
+  }
+
+  // Land SFX on transition from air to ground
+  if (player.onGround && !wasOnGround && gameState === STATE.PLAYING) {
+    playSfx('land');
+  }
+
+  // Camera follow
+  const targetX = player.x - VW * 0.25;
+  camera.x = Math.max(0, Math.min(LEVEL_W - VW, targetX));
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderTitle() {
+  // Sky and background
+  drawSkyGradient();
+  // distant hills
+  ctx.fillStyle = COL.HILL_FAR;
+  drawHill(0, 130, 240, COL.HILL_FAR);
+  drawHill(180, 145, 240, COL.HILL_NEAR);
+  drawHill(320, 130, 240, COL.HILL_FAR);
+  // a few clouds
+  drawCloud(60, 30, 1);
+  drawCloud(280, 50, 1);
+  drawCloud(390, 25, 1);
+  // ground
+  ctx.fillStyle = COL.GRASS;
+  ctx.fillRect(0, GROUND_Y, VW, 6);
+  ctx.fillStyle = COL.GRASS_DK;
+  ctx.fillRect(0, GROUND_Y + 4, VW, 2);
+  ctx.fillStyle = COL.DIRT;
+  ctx.fillRect(0, GROUND_Y + 6, VW, VH - GROUND_Y - 6);
+
+  // small fence behind
+  ctx.fillStyle = COL.FENCE;
+  for (let i = 0; i < 30; i++) {
+    px(i * 16 + 4, 178, 3, 24);
+  }
+  ctx.fillStyle = COL.FENCE_DK;
+  ctx.fillRect(0, 184, VW, 2);
+
+  // Title text — REDDY'S GREAT ESCAPE
+  ctx.font = 'bold 26px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.RUST;
+  ctx.strokeText("REDDY'S", VW / 2, 70);
+  ctx.fillText("REDDY'S", VW / 2, 70);
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('GREAT ESCAPE', VW / 2, 100);
+  ctx.fillText('GREAT ESCAPE', VW / 2, 100);
+
+  // Subtitle "A red panda's journey home"
+  ctx.font = 'bold 11px "Courier New", monospace';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText("A RED PANDA'S JOURNEY HOME", VW / 2, 122);
+  ctx.fillText("A RED PANDA'S JOURNEY HOME", VW / 2, 122);
+
+  // Reddy bouncing on ground
+  const bounce = Math.floor(Math.abs(Math.sin(stateTimer * 0.08)) * 4);
+  const reddyY = GROUND_Y - 24 - bounce;
+  const reddyState = bounce > 0 ? 'jump' : 'idle';
+  drawReddy(VW / 2 - 6, reddyY, reddyState, 0, 1, false);
+
+  // Press space prompt — blinking
+  if (Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 13px "Courier New", monospace';
+    ctx.lineWidth = 3;
+    ctx.fillStyle = COL.WHITE;
+    ctx.strokeText('PRESS SPACE TO START', VW / 2, 240);
+    ctx.fillText('PRESS SPACE TO START', VW / 2, 240);
+  }
+
+  // Controls hint
+  ctx.font = 'bold 9px "Courier New", monospace';
+  ctx.lineWidth = 2;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText('ARROWS / SPACE  |  ESC: PAUSE  |  M: MUTE', VW / 2, 258);
+  ctx.fillText('ARROWS / SPACE  |  ESC: PAUSE  |  M: MUTE', VW / 2, 258);
+
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+}
+
+function renderPlaying() {
+  drawThemedBg();
+
+  ctx.save();
+  ctx.translate(-Math.floor(camera.x), 0);
+
+  drawGroundThemed();
+
+  // Pits / water hazards (drawn into the gap)
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (ob.type === 'stream') drawStream(ob);
+    else if (ob.type === 'puddle') drawPuddle(ob);
+  }
+  // Ice patches (ground level)
+  for (let i = 0; i < obstacles.length; i++) {
+    if (obstacles[i].type === 'ice') drawIcePatch(obstacles[i]);
+  }
+  // Den at back
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    if (ob.type === 'den') {
+      if (ob.big) drawBigDen(ob);
+      else drawDen(ob);
+    }
+  }
+  // Other obstacles
+  for (let i = 0; i < obstacles.length; i++) {
+    const ob = obstacles[i];
+    switch (ob.type) {
+      case 'rock':        drawRock(ob); break;
+      case 'log':         drawLog(ob); break;
+      case 'box':         drawBox(ob); break;
+      case 'stump':       drawStump(ob); break;
+      case 'branch':      drawBranch(ob); break;
+      case 'fence':       drawFence(ob); break;
+      case 'dumpster':    drawDumpster(ob); break;
+      case 'trashcan':    drawTrashcan(ob); break;
+      case 'hydrant':     drawHydrant(ob); break;
+      case 'newsstand':   drawNewsstand(ob); break;
+      case 'parked_car':  drawParkedCar(ob); break;
+      case 'car':         drawCar(ob); break;
+      case 'truck':       drawTruck(ob); break;
+      case 'bench':       drawBench(ob); break;
+      case 'hedge':       drawHedge(ob); break;
+      case 'gnome':       drawGnome(ob); break;
+      case 'dog':         drawDog(ob); break;
+      case 'wheeliebin':  drawWheelieBin(ob); break;
+      case 'barrier':     drawBarrier(ob); break;
+      case 'treeroot':    drawTreeRoot(ob); break;
+      case 'boulder':     drawBoulder(ob); break;
+      case 'rolling_log': drawRollingLog(ob); break;
+      case 'fountain':    drawFountain(ob); break;
+      case 'outcrop':     drawOutcrop(ob); break;
+    }
+  }
+
+  // Collectibles
+  for (let i = 0; i < collectibles.length; i++) {
+    if (!collectibles[i].taken) drawCollectible(collectibles[i]);
+  }
+
+  // Hint signs (level 1 only)
+  drawHints();
+
+  // Player (with i-frame blink)
+  if (player.invincible <= 0 || Math.floor(player.invincible / 4) % 2 === 0) {
+    drawReddy(player.x, player.y, player.state, player.animFrame, player.facing, player.ducking);
+  }
+
+  ctx.restore();
+
+  drawHud();
+
+  // Level intro banner
+  if (stateTimer < 120) {
+    const meta = LEVEL_META[currentLevel];
+    const fade = stateTimer < 90 ? 1 : (120 - stateTimer) / 30;
+    ctx.font = 'bold 14px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = COL.BLACK;
+    ctx.fillStyle = COL.GOLD;
+    ctx.globalAlpha = fade;
+    ctx.strokeText('LEVEL ' + currentLevel + ' - ' + meta.name, VW / 2, 56);
+    ctx.fillText('LEVEL ' + currentLevel + ' - ' + meta.name, VW / 2, 56);
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+  }
+}
+
+function renderGameOver() {
+  // dark zoo cell background
+  ctx.fillStyle = '#221a1a';
+  ctx.fillRect(0, 0, VW, VH);
+  // dim brick wall
+  ctx.fillStyle = '#3a2a2a';
+  for (let y = 0; y < VH; y += 12) {
+    for (let x = (y / 12) % 2 === 0 ? 0 : 24; x < VW; x += 48) {
+      ctx.fillRect(x, y, 46, 10);
+    }
+  }
+  // floor
+  ctx.fillStyle = '#1a1010';
+  ctx.fillRect(0, GROUND_Y, VW, VH - GROUND_Y);
+  ctx.fillStyle = '#2a1a10';
+  for (let i = 0; i < VW; i += 16) ctx.fillRect(i, GROUND_Y + 4, 1, 30);
+
+  // jail bars
+  ctx.fillStyle = '#888';
+  for (let i = 30; i < VW; i += 30) {
+    ctx.fillRect(i, 30, 6, VH - 30);
+    ctx.fillStyle = '#bbb';
+    ctx.fillRect(i, 30, 1, VH - 30);
+    ctx.fillStyle = '#888';
+  }
+  // top bar
+  ctx.fillStyle = '#888';
+  ctx.fillRect(20, 30, VW - 40, 6);
+
+  // Sad Reddy behind bars
+  drawReddy(VW / 2 - 6, GROUND_Y - 24, 'idle', 0, 1, false);
+  // tear
+  if (Math.floor(stateTimer / 12) % 3 !== 0) {
+    ctx.fillStyle = COL.WATER_LT;
+    px(VW / 2 - 3, GROUND_Y - 18, 1, 2);
+  }
+
+  // text
+  ctx.font = 'bold 22px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.FRUIT;
+  ctx.strokeText('GAME OVER', VW / 2, 70);
+  ctx.fillText('GAME OVER', VW / 2, 70);
+
+  ctx.font = 'bold 12px "Courier New", monospace';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText('REDDY GOT CAUGHT!', VW / 2, 100);
+  ctx.fillText('REDDY GOT CAUGHT!', VW / 2, 100);
+
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('FINAL SCORE: ' + score, VW / 2, 130);
+  ctx.fillText('FINAL SCORE: ' + score, VW / 2, 130);
+
+  if (stateTimer > 30 && Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 12px "Courier New", monospace';
+    ctx.fillStyle = COL.WHITE;
+    ctx.strokeText('PRESS SPACE TO TRY AGAIN', VW / 2, 162);
+    ctx.fillText('PRESS SPACE TO TRY AGAIN', VW / 2, 162);
+  }
+  ctx.textAlign = 'left';
+}
+
+function renderWin() {
+  drawSkyGradient();
+  // celebratory bg with hills
+  drawHill(0, 130, 240, COL.HILL_FAR);
+  drawHill(180, 140, 240, COL.HILL_NEAR);
+  drawHill(320, 130, 240, COL.HILL_FAR);
+  drawCloud(60, 30, 1);
+  drawCloud(330, 40, 1);
+  // ground
+  ctx.fillStyle = COL.GRASS;
+  ctx.fillRect(0, GROUND_Y, VW, 6);
+  ctx.fillStyle = COL.GRASS_DK;
+  ctx.fillRect(0, GROUND_Y + 4, VW, 2);
+  ctx.fillStyle = COL.DIRT;
+  ctx.fillRect(0, GROUND_Y + 6, VW, VH - GROUND_Y - 6);
+
+  // Den on right
+  drawDen({ x: 280, y: GROUND_Y - 50, w: 60, h: 50 });
+
+  // Reddy hopping happily
+  const bounce = Math.floor(Math.abs(Math.sin(stateTimer * 0.15)) * 6);
+  const reddyState = bounce > 1 ? 'jump' : 'idle';
+  drawReddy(180, GROUND_Y - 24 - bounce, reddyState, 0, 1, false);
+
+  // sparkles
+  for (let i = 0; i < 12; i++) {
+    const sx = (Math.sin(stateTimer * 0.05 + i) * 100) + 240;
+    const sy = (Math.cos(stateTimer * 0.07 + i) * 30) + 90;
+    if (Math.floor(stateTimer / 5 + i) % 4 === 0) {
+      ctx.fillStyle = COL.GOLD_LT;
+      px(sx, sy, 2, 2);
+    }
+  }
+
+  // text
+  ctx.font = 'bold 20px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('LEVEL COMPLETE!', VW / 2, 56);
+  ctx.fillText('LEVEL COMPLETE!', VW / 2, 56);
+
+  ctx.font = 'bold 11px "Courier New", monospace';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = COL.WHITE;
+  const meta = LEVEL_META[currentLevel];
+  const sub = meta ? (meta.name + ' CLEARED') : 'CLEARED';
+  ctx.strokeText(sub, VW / 2, 86);
+  ctx.fillText(sub, VW / 2, 86);
+
+  ctx.font = 'bold 13px "Courier New", monospace';
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('SCORE: ' + score, VW / 2, 116);
+  ctx.fillText('SCORE: ' + score, VW / 2, 116);
+
+  if (stateTimer > 30 && Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.fillStyle = COL.WHITE;
+    ctx.strokeText('PRESS SPACE TO CONTINUE', VW / 2, 146);
+    ctx.fillText('PRESS SPACE TO CONTINUE', VW / 2, 146);
+  }
+  ctx.textAlign = 'left';
+}
+
+function renderStory() {
+  // dark background scene
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, VW, VH);
+  // dim moon
+  ctx.fillStyle = '#9a9aaa';
+  px(VW - 70, 30, 18, 18);
+  ctx.fillStyle = '#0a0a1a';
+  px(VW - 64, 28, 10, 10);
+  // stars
+  ctx.fillStyle = COL.WHITE;
+  for (let i = 0; i < 30; i++) {
+    const sx = (i * 53 + 17) % VW;
+    const sy = (i * 31 + 7) % 80;
+    px(sx, sy, 1, 1);
+  }
+  // ground
+  ctx.fillStyle = '#1a2a1a';
+  ctx.fillRect(0, GROUND_Y, VW, VH - GROUND_Y);
+  ctx.fillStyle = '#2a4a2a';
+  ctx.fillRect(0, GROUND_Y, VW, 4);
+
+  // Panel content
+  let panelText1, panelText2;
+  if (storyPanel === 0) {
+    // Reddy in cage, looking out
+    // cage bars
+    ctx.fillStyle = '#888';
+    for (let i = 60; i < 200; i += 14) {
+      px(i, 130, 4, 70);
+    }
+    px(58, 128, 144, 4);
+    // dim Reddy
+    drawReddy(110, GROUND_Y - 24, 'idle', 0, 1, false);
+    panelText1 = 'Deep in the city zoo, a red panda';
+    panelText2 = 'named Reddy dreamed of the wild...';
+  } else if (storyPanel === 1) {
+    // Open gate, Reddy looking out
+    ctx.fillStyle = '#888';
+    for (let i = 60; i < 130; i += 14) {
+      px(i, 130, 4, 70);
+    }
+    px(58, 128, 76, 4);
+    // open gate
+    ctx.fillStyle = '#666';
+    for (let i = 134; i < 200; i += 14) {
+      px(i, 130, 4, 60);
+    }
+    // tilted gate
+    ctx.save();
+    ctx.translate(140, 132);
+    ctx.rotate(-0.3);
+    ctx.fillStyle = '#888';
+    for (let i = 0; i < 60; i += 14) {
+      ctx.fillRect(i, 0, 4, 60);
+    }
+    ctx.restore();
+    drawReddy(150, GROUND_Y - 24, 'idle', 0, 1, false);
+    panelText1 = 'One day, the zookeeper left the gate';
+    panelText2 = "open. This was Reddy's chance!";
+  } else {
+    // Reddy running
+    ctx.fillStyle = '#1a2a1a';
+    px(0, GROUND_Y - 8, VW, 8);
+    drawReddy(220, GROUND_Y - 24 - Math.floor(Math.abs(Math.sin(stateTimer * 0.2)) * 4), 'walk', Math.floor(stateTimer / 6) % 2, 1, false);
+    // path leading away
+    ctx.fillStyle = '#5a3a1a';
+    for (let i = 0; i < 8; i++) {
+      px(280 + i * 24, GROUND_Y + 4 + i, 18, 2);
+    }
+    // distant city silhouette
+    ctx.fillStyle = '#1a2a4a';
+    for (let i = 0; i < 6; i++) {
+      const x = VW - 100 + i * 20;
+      const h = 30 + (i * 7) % 20;
+      px(x, GROUND_Y - h, 18, h);
+    }
+    panelText1 = 'Help Reddy escape the zoo, cross the';
+    panelText2 = 'city, and find his way home!';
+  }
+
+  // Panel frame
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
+  ctx.fillRect(20, 30, VW - 40, 60);
+  ctx.strokeStyle = COL.GOLD;
+  ctx.lineWidth = 2;
+  ctx.strokeRect(20, 30, VW - 40, 60);
+
+  // Panel text
+  ctx.font = 'bold 11px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText(panelText1, VW / 2, 50);
+  ctx.fillText(panelText1, VW / 2, 50);
+  ctx.strokeText(panelText2, VW / 2, 70);
+  ctx.fillText(panelText2, VW / 2, 70);
+
+  // Panel indicator dots
+  for (let i = 0; i < 3; i++) {
+    ctx.fillStyle = (i === storyPanel) ? COL.GOLD : '#666';
+    px(VW / 2 - 12 + i * 10, 84, 4, 4);
+  }
+
+  // Press space prompt
+  if (Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 9px "Courier New", monospace';
+    ctx.fillStyle = COL.WHITE;
+    ctx.lineWidth = 2;
+    ctx.strokeText('PRESS SPACE TO CONTINUE', VW / 2, 248);
+    ctx.fillText('PRESS SPACE TO CONTINUE', VW / 2, 248);
+  }
+  ctx.textAlign = 'left';
+}
+
+function renderMap() {
+  // Background — sky to nature gradient
+  ctx.fillStyle = '#3a3a5a';
+  ctx.fillRect(0, 0, VW, 50);
+  ctx.fillStyle = '#5a6a8a';
+  ctx.fillRect(0, 50, VW, 50);
+  ctx.fillStyle = '#7aaa6a';
+  ctx.fillRect(0, 100, VW, 100);
+  ctx.fillStyle = '#3a6a3a';
+  ctx.fillRect(0, 200, VW, 70);
+
+  // Title
+  ctx.font = 'bold 16px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText("REDDY'S JOURNEY", VW / 2, 22);
+  ctx.fillText("REDDY'S JOURNEY", VW / 2, 22);
+
+  // Path nodes — winding from left (zoo) to right (home)
+  const nodes = [];
+  for (let i = 1; i <= 10; i++) {
+    const t = (i - 1) / 9;
+    const x = 30 + t * (VW - 60);
+    const y = 160 + Math.sin(t * Math.PI * 2.2) * 35;
+    nodes.push({ x: Math.floor(x), y: Math.floor(y), level: i });
+  }
+
+  // Draw path line connecting nodes
+  ctx.strokeStyle = '#5b3a1b';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(nodes[0].x, nodes[0].y);
+  for (let i = 1; i < nodes.length; i++) {
+    ctx.lineTo(nodes[i].x, nodes[i].y);
+  }
+  ctx.stroke();
+  // dashed cream highlight
+  ctx.strokeStyle = COL.CREAM;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(nodes[0].x, nodes[0].y);
+  for (let i = 1; i < nodes.length; i++) {
+    ctx.lineTo(nodes[i].x, nodes[i].y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Draw nodes
+  for (let i = 0; i < nodes.length; i++) {
+    const n = nodes[i];
+    const isCurrent = (n.level === currentLevel + 1) || (n.level === currentLevel && !levelsCompleted.has(currentLevel));
+    const isCompleted = levelsCompleted.has(n.level);
+    const isFuture = n.level > currentLevel + 1 && !isCompleted;
+
+    let r = 7;
+    if (isCurrent) {
+      const pulse = Math.floor(Math.abs(Math.sin(stateTimer * 0.12)) * 3);
+      r = 7 + pulse;
+    }
+
+    // outer ring
+    ctx.fillStyle = COL.BLACK;
+    px(n.x - r - 1, n.y - r - 1, r * 2 + 2, r * 2 + 2);
+    // fill
+    if (isCompleted) ctx.fillStyle = COL.GOLD;
+    else if (isCurrent) ctx.fillStyle = COL.RUST;
+    else ctx.fillStyle = '#5a5a5a';
+    px(n.x - r, n.y - r, r * 2, r * 2);
+    // inner highlight
+    if (isCompleted) {
+      ctx.fillStyle = COL.GOLD_LT;
+      px(n.x - r + 2, n.y - r + 2, 3, 3);
+    }
+    if (isCurrent) {
+      ctx.fillStyle = COL.RUST_LT;
+      px(n.x - r + 2, n.y - r + 2, 3, 3);
+    }
+    // checkmark on completed
+    if (isCompleted) {
+      ctx.fillStyle = COL.BLACK;
+      px(n.x - 2, n.y - 1, 1, 3);
+      px(n.x - 1, n.y, 1, 3);
+      px(n.x, n.y - 1, 1, 3);
+      px(n.x + 1, n.y - 2, 1, 3);
+      px(n.x + 2, n.y - 3, 1, 3);
+    }
+    // node number
+    ctx.font = 'bold 7px "Courier New", monospace';
+    ctx.fillStyle = COL.WHITE;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = COL.BLACK;
+    const lbl = String(n.level);
+    ctx.strokeText(lbl, n.x, n.y + r + 9);
+    ctx.fillText(lbl, n.x, n.y + r + 9);
+    // level name (under node)
+    ctx.font = 'bold 6px "Courier New", monospace';
+    const meta = LEVEL_META[n.level];
+    if (meta) {
+      ctx.strokeText(meta.name, n.x, n.y + r + 18);
+      ctx.fillText(meta.name, n.x, n.y + r + 18);
+    }
+  }
+
+  // Reddy icon on current target node
+  const targetLevel = currentLevel + 1;
+  let targetNode = null;
+  for (const n of nodes) if (n.level === targetLevel) { targetNode = n; break; }
+  if (targetNode) {
+    const bounce = Math.floor(Math.abs(Math.sin(stateTimer * 0.18)) * 3);
+    drawReddy(targetNode.x - 6, targetNode.y - 30 - bounce, 'idle', 0, 1, false);
+  }
+
+  // Score (top right)
+  ctx.font = 'bold 11px "Courier New", monospace';
+  ctx.fillStyle = COL.GOLD;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.textAlign = 'right';
+  const sTxt = 'SCORE: ' + score;
+  ctx.strokeText(sTxt, VW - 10, 22);
+  ctx.fillText(sTxt, VW - 10, 22);
+
+  // Press space prompt (bottom)
+  if (stateTimer > 30 && Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = COL.WHITE;
+    ctx.strokeText('PRESS SPACE TO CONTINUE', VW / 2, 254);
+    ctx.fillText('PRESS SPACE TO CONTINUE', VW / 2, 254);
+  }
+  ctx.textAlign = 'left';
+}
+
+function renderGameWin() {
+  // bright forest victory
+  drawBgDeepForest();
+  // ground
+  ctx.fillStyle = '#5cba4a';
+  ctx.fillRect(0, GROUND_Y, VW, 6);
+  ctx.fillStyle = '#2a6a20';
+  ctx.fillRect(0, GROUND_Y + 4, VW, 2);
+  ctx.fillStyle = '#5a3a2a';
+  ctx.fillRect(0, GROUND_Y + 6, VW, VH - GROUND_Y - 6);
+
+  // Big den in center
+  drawBigDen({ x: VW / 2 - 40, y: GROUND_Y - 60, w: 80, h: 60, big: true });
+
+  // Reddy at den, hopping happily
+  const bounce = Math.floor(Math.abs(Math.sin(stateTimer * 0.15)) * 8);
+  const reddyState = bounce > 2 ? 'jump' : 'idle';
+  drawReddy(VW / 2 - 6, GROUND_Y - 24 - bounce, reddyState, 0, 1, false);
+
+  // sparkles flying around
+  for (let i = 0; i < 16; i++) {
+    const angle = stateTimer * 0.05 + i * 0.6;
+    const sx = VW / 2 + Math.cos(angle) * (60 + (i % 3) * 20);
+    const sy = 100 + Math.sin(angle) * (40 + (i % 3) * 10);
+    if (Math.floor(stateTimer / 4 + i) % 4 === 0) {
+      ctx.fillStyle = i % 2 === 0 ? COL.GOLD_LT : COL.WHITE;
+      px(Math.floor(sx), Math.floor(sy), 2, 2);
+    }
+  }
+
+  // confetti
+  for (let i = 0; i < 24; i++) {
+    const fy = ((stateTimer * 1.5 + i * 22) % VH);
+    const fx = (i * 67 + 30) % VW;
+    const colors = [COL.GOLD, COL.FRUIT, COL.BAMBOO, '#3b82c4', '#9a4ac8'];
+    ctx.fillStyle = colors[i % colors.length];
+    px(fx, fy, 2, 4);
+  }
+
+  // Title text
+  ctx.font = 'bold 22px "Courier New", monospace';
+  ctx.textAlign = 'center';
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = COL.BLACK;
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('REDDY MADE IT HOME!', VW / 2, 50);
+  ctx.fillText('REDDY MADE IT HOME!', VW / 2, 50);
+
+  ctx.font = 'bold 11px "Courier New", monospace';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = COL.WHITE;
+  ctx.strokeText('THE GREAT ESCAPE IS COMPLETE', VW / 2, 78);
+  ctx.fillText('THE GREAT ESCAPE IS COMPLETE', VW / 2, 78);
+
+  ctx.font = 'bold 14px "Courier New", monospace';
+  ctx.fillStyle = COL.GOLD;
+  ctx.strokeText('FINAL SCORE: ' + score, VW / 2, 102);
+  ctx.fillText('FINAL SCORE: ' + score, VW / 2, 102);
+
+  if (stateTimer > 60 && Math.floor(stateTimer / 30) % 2 === 0) {
+    ctx.font = 'bold 10px "Courier New", monospace';
+    ctx.fillStyle = COL.WHITE;
+    ctx.lineWidth = 3;
+    ctx.strokeText('PRESS SPACE TO PLAY AGAIN', VW / 2, 250);
+    ctx.fillText('PRESS SPACE TO PLAY AGAIN', VW / 2, 250);
+  }
+  ctx.textAlign = 'left';
+}
+
+// ============================================================
+// PAUSE
+// ============================================================
+function renderPaused() {
+  // Draw the underlying game screen frozen behind the overlay
+  renderPlaying();
+  // Dark translucent overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, VW, VH);
+  // Pause box
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(VW / 2 - 80, 80, 160, 110);
+  ctx.strokeStyle = '#f0c040';
+  ctx.lineWidth = 3;
+  ctx.strokeRect(VW / 2 - 80, 80, 160, 110);
+  // Text
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 20px "Courier New", monospace';
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = '#1a1010';
+  ctx.fillStyle = '#f0c040';
+  ctx.strokeText('PAUSED', VW / 2, 112);
+  ctx.fillText('PAUSED', VW / 2, 112);
+  ctx.font = 'bold 10px "Courier New", monospace';
+  ctx.lineWidth = 2;
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeText('ESC / P  —  RESUME', VW / 2, 138);
+  ctx.fillText('ESC / P  —  RESUME', VW / 2, 138);
+  ctx.fillStyle = '#ffaaaa';
+  ctx.strokeText('Q  —  MAIN MENU', VW / 2, 155);
+  ctx.fillText('Q  —  MAIN MENU', VW / 2, 155);
+  ctx.fillStyle = audio.muted ? '#ff8888' : '#aaffaa';
+  ctx.strokeText('M  —  ' + (audio.muted ? 'UNMUTE' : 'MUTE'), VW / 2, 172);
+  ctx.fillText('M  —  ' + (audio.muted ? 'UNMUTE' : 'MUTE'), VW / 2, 172);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+}
+
+function updatePaused() {
+  if (keyPressed['Escape'] || keyPressed['KeyP']) {
+    gameState = prevState;
+  }
+  if (keyPressed['KeyQ']) {
+    gameState = STATE.TITLE;
+    stateTimer = 0;
+  }
+}
+
+function render() {
+  if (gameState === STATE.TITLE) renderTitle();
+  else if (gameState === STATE.PLAYING) renderPlaying();
+  else if (gameState === STATE.GAMEOVER) renderGameOver();
+  else if (gameState === STATE.WIN) renderWin();
+  else if (gameState === STATE.STORY) renderStory();
+  else if (gameState === STATE.MAP) renderMap();
+  else if (gameState === STATE.GAMEWIN) renderGameWin();
+  else if (gameState === STATE.PAUSED) renderPaused();
+}
+
+// ============================================================
+// MAIN LOOP (fixed timestep)
+// ============================================================
+let lastTime = performance.now();
+let acc = 0;
+const STEP = 1000 / 60;
+
+function loop(now) {
+  let dt = now - lastTime;
+  lastTime = now;
+  if (dt > 250) dt = 250;
+  acc += dt;
+  while (acc >= STEP) {
+    frameCount++;
+    // Global pause toggle (works from PLAYING state)
+    if (keyPressed['Escape'] || keyPressed['KeyP']) {
+      if (gameState === STATE.PLAYING) {
+        prevState = gameState;
+        gameState = STATE.PAUSED;
+        clearKeyPressed();
+        acc -= STEP;
+        continue;
+      }
+    }
+    if (gameState === STATE.TITLE) updateTitle();
+    else if (gameState === STATE.PLAYING) updatePlaying();
+    else if (gameState === STATE.GAMEOVER) updateGameOver();
+    else if (gameState === STATE.WIN) updateWin();
+    else if (gameState === STATE.STORY) updateStory();
+    else if (gameState === STATE.MAP) updateMap();
+    else if (gameState === STATE.GAMEWIN) updateGameWin();
+    else if (gameState === STATE.PAUSED) updatePaused();
+    clearKeyPressed();
+    acc -= STEP;
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
