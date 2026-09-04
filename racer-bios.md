@@ -100,3 +100,25 @@ Source: "Racer Bio — Ohio High Wheel Race" notification emails via Web3Forms, 
 - Wheel size: 52"
 - Origin story: I wanted a bicycle that, in the event of a worldwide supply chain collapse, could be repaired and rebuilt entirely by local Amish Blacksmiths.
 - Fun fact: I have a paralyzing fear of heights. Seriously.
+
+---
+
+## Scott Paris — Frederick, MD
+**Submitted:** 2026-09-04
+
+- Years riding: 3 years
+- Bike brand: Hoppley — bike name "The Flying Dutchman"
+- Wheel size: 36 inch
+- Origin story: There was a penny farthing race in Frederick in 2024 and having just moved here, I thought it would be fun! And the participants are rock stars for three hours!
+- Fun fact: Have qualified and completed in six Boston Marathons. This is the next part of my athletic career — different!
+
+---
+
+## Nyle Blanck — Milford, CT
+**Submitted:** 2026-09-04
+
+- Years riding: 10 years
+- Bike brand: Penny Farthing Dan Racer
+- Wheel size: 56"
+- Origin story: My dad collects antique automobiles from the early 20th century. I grew up in the antique car hobby and while researching early cars, I learned that many car companies started as bicycle manufacturers. I was already an avid road cyclist so I combined the hobbies and started collecting turn of the century, car related bicycles. Being from Connecticut, I also focused on Connecticut built bikes. In 2016 I purchased my first penny farthing, an 1886 56" Columbia Expert, which was perfect being a car related and CT manufactured bicycle. The obsession grew and now I own about 75 bicycles, with 25 of them being penny farthings. I completed my first race on that original bike in Frederick, MD but I quickly upgraded to something more modern after that when I couldn't keep up with the peloton!
+- Fun fact: I am currently the National Commander of the international antique bicycle organization, The Wheelmen. I also have a 5 year old son named Stanley (named after the Stanley steam car) that is obsessed with bicycles and another boy on the way, due on Halloween!
