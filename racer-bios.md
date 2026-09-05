@@ -103,6 +103,17 @@ Source: "Racer Bio — Ohio High Wheel Race" notification emails via Web3Forms, 
 
 ---
 
+## Tara Rivers — Frederick, MD
+**Submitted:** 2026-08-27 (via direct email reply, not the web form — bio attached as a .docx)
+
+- Years riding: Since October 2025
+- Bike brand: Standard High Wheel Touring ("The Crimson Chariot")
+- Wheel size: 48"
+- Origin story: It took 4 years of watching the high wheel race in my adopted hometown of Frederick to go from mesmerized to "can anyone do that?" to "I'm going to buy one." I finally purchased my bike in October 2025 — the same week the organizers announced they were skipping 2026 in favor of a biennial schedule. Once I found out Plain City, OH was stepping up, I was in!
+- Fun fact: I'm riding The Crimson Chariot as Hera, Greek goddess of marriage, because my husband and I have a thing for peacocks. Hera's chariot is drawn by peacocks, and since we were married earlier this year, it felt perfect. Keep an eye out for Zeus in the cheering crowd.
+
+---
+
 ## Scott Paris — Frederick, MD
 **Submitted:** 2026-09-04
 
