@@ -144,3 +144,25 @@ Source: "Racer Bio — Ohio High Wheel Race" notification emails via Web3Forms, 
 - Wheel size: 55
 - Origin story: Got into penny farthings by my dad collecting old cars then car companies that also built bicycles. We then found out about the wheelmen then the rest was history
 - Fun fact: I can ride my high wheel with no handlebars!
+
+---
+
+## Charles Miller — Shelby, OH
+**Submitted:** 2026-09-09
+
+- Years riding: 30 years
+- Bike brand: Standard
+- Wheel size: 50
+- Origin story: My Dad purchased an 1886-52" Columbia Expert By Pope mfg in the 1980s off a guy at a gas station for $100:).. I remember from my dads story, it needed handle bars & a rear wheel... anyhow, he made handle bars & found a 1950s baby carriage wheel as a sufficient replacement for the rear. My dad would ride it in parades for fun and I started riding that high wheel when I was 15 years old (30 years ago). I have ridden in parades over the years & recently purchased 3 new high wheelers as my sons have shown just a slight interest. This will be my first race & I'm very excited to have my son ride with me. I'm trying to convince my wife to ride with me, but she thinks I`m crazy.. she might be right..
+- Fun fact: I have 5 kids, Im an Auctioneer, I Coach wrestling, I ride high wheel bicycles...
+
+---
+
+## Micah Miller — Shelby, OH
+**Submitted:** 2026-09-09
+
+- Years riding: 1 year
+- Bike brand: UDC MK5 Penny Farthinh
+- Wheel size: 50
+- Origin story: My dad likes them and I love my dad.
+- Fun fact: I've had both ACLs reconstructed.. why am I racing high wheel bicycle ..
