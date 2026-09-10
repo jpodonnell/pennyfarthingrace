@@ -98,105 +98,13 @@
       </div>
     </section>
 
-    <!-- ===== REGISTRATION FORM ===== -->
+    <!-- ===== REGISTRATION CLOSED ===== -->
     <section class="register-section section" id="register">
       <div class="container">
-        <h2 class="section-heading">Register for the Race</h2>
-        <p style="color:var(--text-mid);margin-bottom:1.25rem;">Fill out the form below to claim your spot.</p>
-        <div style="background:var(--cream);border-left:4px solid var(--copper);padding:1.1rem 1.4rem;border-radius:0 var(--radius) var(--radius) 0;margin-bottom:2rem;">
-          <p style="margin:0;color:var(--navy);font-size:0.95rem;"><strong>A note on year one:</strong> This inaugural race is held on a Thursday. Our goal is to grow the Ohio High Wheel Race into an annual event — with future races moving to the weekend — but that future is built on the foundation we lay right now. Register today and help make this a tradition.</p>
-        </div>
-
-        <div class="form-wrap">
-
-          <!-- Success message (hidden until form submits) -->
-          <div class="form-success" id="form-success" role="alert">
-            <h3>You're registered!</h3>
-            <p>Thanks for signing up for the Ohio High Wheel Race. Watch your email for a confirmation.</p>
-            <p style="margin-top:0.5rem;">Questions? Email <a href="mailto:info@highwheelraceohio.com">info@highwheelraceohio.com</a></p>
-          </div>
-
-          <!-- Error message -->
-          <div class="form-error-msg" id="form-error" role="alert"></div>
-
-          <!--
-            IMPORTANT: Replace YOUR_FORMSPREE_FORM_ID below with your actual Formspree form ID.
-            Sign up at formspree.io, create a new form, and copy the ID (format: xpzgabcd).
-            The action URL should be: https://formspree.io/f/YOUR_FORM_ID
-          -->
-          <form
-            id="registration-form"
-            action="https://api.web3forms.com/submit"
-            method="POST"
-            novalidate
-          >
-            <!-- Web3Forms access key -->
-            <input type="hidden" name="access_key" value="f0cbb500-ae9b-4bce-911e-8ea3ed83ea52">
-            <input type="hidden" name="subject" value="New Race Registration — Ohio High Wheel Race">
-            <!-- Honeypot (spam prevention) -->
-            <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
-
-            <!-- Name -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="first-name">First Name <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="first-name" name="first_name" required autocomplete="given-name" placeholder="Jane">
-              </div>
-              <div class="form-group">
-                <label for="last-name">Last Name <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="last-name" name="last_name" required autocomplete="family-name" placeholder="Smith">
-              </div>
-            </div>
-
-            <!-- Email -->
-            <div class="form-group">
-              <label for="email">Email Address <span class="req" aria-hidden="true">*</span></label>
-              <input type="email" id="email" name="email" required autocomplete="email" placeholder="jane@example.com">
-            </div>
-
-            <!-- City / State -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="city">City <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="city" name="city" required autocomplete="address-level2" placeholder="Plain City">
-              </div>
-              <div class="form-group">
-                <label for="state">State <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="state" name="state" required autocomplete="address-level1" placeholder="OH">
-              </div>
-            </div>
-
-            <!-- Experience -->
-            <div class="form-group">
-              <label for="years-riding">Years riding a penny farthing <span class="req" aria-hidden="true">*</span></label>
-              <input type="number" id="years-riding" name="years_riding" required min="0" max="100" placeholder="e.g. 3">
-            </div>
-
-            <!-- Emergency Contact -->
-            <div class="form-row">
-              <div class="form-group">
-                <label for="emergency-name">Emergency Contact Name <span class="req" aria-hidden="true">*</span></label>
-                <input type="text" id="emergency-name" name="emergency_contact_name" required placeholder="Full name">
-              </div>
-              <div class="form-group">
-                <label for="emergency-phone">Emergency Contact Phone <span class="req" aria-hidden="true">*</span></label>
-                <input type="tel" id="emergency-phone" name="emergency_contact_phone" required autocomplete="tel" placeholder="(614) 555-0100">
-              </div>
-            </div>
-
-            <!-- Waiver -->
-            <div class="checkbox-group">
-              <input type="checkbox" id="waiver" name="waiver_agreed" value="yes" required>
-              <label for="waiver">
-                I have read and agree to the race rules and safety requirements listed above. I understand that I must sign the official waiver document on race day, that helmets are required, and that I must supply my own penny farthing. <span class="req" aria-hidden="true">*</span>
-              </label>
-            </div>
-
-            <button type="submit" class="btn btn-primary" style="width:100%;font-size:1.05rem;padding:0.875rem;">
-              Register for the Race
-            </button>
-
-          </form>
+        <h2 class="section-heading">Registration Is Closed</h2>
+        <p style="color:var(--text-mid);margin-bottom:1.25rem;">Racer registration for the 2026 Ohio High Wheel Race has closed ahead of race day.</p>
+        <div style="background:var(--cream);border-left:4px solid var(--copper);padding:1.1rem 1.4rem;border-radius:0 var(--radius) var(--radius) 0;">
+          <p style="margin:0;color:var(--navy);font-size:0.95rem;">Questions? Email <a href="mailto:info@highwheelraceohio.com">info@highwheelraceohio.com</a></p>
         </div>
       </div>
     </section>
